@@ -1,9 +1,11 @@
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Vote, BarChart3, Users, FileCheck, QrCode } from "lucide-react";
 import heroBackground from "@/assets/hero-background.jpg";
 
 const Index = () => {
+  const navigate = useNavigate();
   const features = [
     {
       icon: Shield,
@@ -69,13 +71,13 @@ const Index = () => {
             </p>
             
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button size="lg" className="gap-2 shadow-lg transition-all hover:shadow-xl">
+              <Button size="lg" className="gap-2 shadow-lg transition-all hover:shadow-xl" onClick={() => navigate('/auth')}>
                 <Users className="h-5 w-5" />
                 Começar Agora
               </Button>
-              <Button size="lg" variant="outline" className="gap-2">
+              <Button size="lg" variant="outline" className="gap-2" onClick={() => navigate('/dashboard')}>
                 <BarChart3 className="h-5 w-5" />
-                Ver Resultados
+                Acessar Dashboard
               </Button>
             </div>
           </div>
