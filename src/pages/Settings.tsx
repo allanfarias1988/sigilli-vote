@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -37,7 +37,7 @@ export default function Settings() {
 
   const loadData = async () => {
     try {
-      const { data: profileData } = await supabase
+      const { data: profileData } = await db
         .from('profiles')
         .select('*, tenants(*)')
         .eq('id', user!.id)
@@ -76,11 +76,10 @@ export default function Settings() {
     setSaving(true);
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('profiles')
         .update({
           nome: profileForm.nome,
-          email: profileForm.email,
           telefone: profileForm.telefone
         })
         .eq('id', user!.id);
@@ -106,7 +105,7 @@ export default function Settings() {
     setSaving(true);
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('tenants')
         .update({
           nome: tenantForm.nome,

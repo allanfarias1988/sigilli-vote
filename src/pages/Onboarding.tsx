@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,7 +33,7 @@ export default function Onboarding() {
         .replace(/^-+|-+$/g, '');
 
       // Create tenant
-      const { data: tenantData, error: tenantError } = await supabase
+      const { data: tenantData, error: tenantError } = await db
         .from('tenants')
         .insert({
           nome: form.nomeIgreja,
@@ -45,7 +45,7 @@ export default function Onboarding() {
       if (tenantError) throw tenantError;
 
       // Create profile
-      const { error: profileError } = await supabase
+      const { error: profileError } = await db
         .from('profiles')
         .insert({
           id: user!.id,
@@ -58,7 +58,7 @@ export default function Onboarding() {
       if (profileError) throw profileError;
 
       // Assign tenant_admin role
-      const { error: roleError } = await supabase
+      const { error: roleError } = await db
         .from('user_roles')
         .insert({
           user_id: user!.id,

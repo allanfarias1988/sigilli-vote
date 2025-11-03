@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,7 +45,7 @@ export default function Commissions() {
 
   const loadData = async () => {
     try {
-      const { data: profile } = await supabase
+      const { data: profile } = await db
         .from('profiles')
         .select('tenant_id')
         .eq('id', user!.id)
@@ -58,7 +58,7 @@ export default function Commissions() {
 
       setTenantId(profile.tenant_id);
 
-      const { data: commissionsData, error } = await supabase
+      const { data: commissionsData, error } = await db
         .from('commissions')
         .select('*')
         .eq('tenant_id', profile.tenant_id)
@@ -87,7 +87,7 @@ export default function Commissions() {
     if (!tenantId) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('commissions')
         .insert({
           tenant_id: tenantId,
@@ -121,7 +121,7 @@ export default function Commissions() {
 
   const updateStatus = async (commission: Commission, newStatus: 'draft' | 'aberta' | 'finalizada') => {
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('commissions')
         .update({ status: newStatus })
         .eq('id', commission.id);

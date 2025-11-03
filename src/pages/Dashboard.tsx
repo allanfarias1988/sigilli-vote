@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Users, FileText, Vote, BarChart3, Settings, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { StorageModeIndicator } from '@/components/StorageModeIndicator';
 
 export default function Dashboard() {
   const { user, signOut, loading: authLoading } = useAuth();
@@ -28,7 +29,7 @@ export default function Dashboard() {
 
   const loadUserData = async () => {
     try {
-      const { data: profileData } = await supabase
+      const { data: profileData } = await db
         .from('profiles')
         .select('*, tenants(*)')
         .eq('id', user!.id)
@@ -98,6 +99,7 @@ export default function Dashboard() {
             {tenant && <p className="text-sm text-muted-foreground">{tenant.nome}</p>}
           </div>
           <div className="flex items-center gap-4">
+            <StorageModeIndicator />
             <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
               <Settings className="h-5 w-5" />
             </Button>

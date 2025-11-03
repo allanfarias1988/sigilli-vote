@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -50,7 +50,7 @@ export default function Members() {
 
   const loadData = async () => {
     try {
-      const { data: profile } = await supabase
+      const { data: profile } = await db
         .from('profiles')
         .select('tenant_id')
         .eq('id', user!.id)
@@ -63,7 +63,7 @@ export default function Members() {
 
       setTenantId(profile.tenant_id);
 
-      const { data: membersData, error } = await supabase
+      const { data: membersData, error } = await db
         .from('members')
         .select('*')
         .eq('tenant_id', profile.tenant_id)
@@ -100,7 +100,7 @@ export default function Members() {
       };
 
       if (editingMember) {
-        const { error } = await supabase
+        const { error } = await db
           .from('members')
           .update(memberData)
           .eq('id', editingMember.id);
@@ -108,7 +108,7 @@ export default function Members() {
         if (error) throw error;
         toast({ title: 'Membro atualizado com sucesso!' });
       } else {
-        const { error } = await supabase
+        const { error } = await db
           .from('members')
           .insert(memberData);
 
@@ -147,7 +147,7 @@ export default function Members() {
     if (!confirm('Tem certeza que deseja excluir este membro?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('members')
         .delete()
         .eq('id', id);

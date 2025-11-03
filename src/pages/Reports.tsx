@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowLeft, BarChart3 } from 'lucide-react';
@@ -30,7 +30,7 @@ export default function Reports() {
 
   const loadStats = async () => {
     try {
-      const { data: profile } = await supabase
+      const { data: profile } = await db
         .from('profiles')
         .select('tenant_id')
         .eq('id', user!.id)
@@ -48,11 +48,11 @@ export default function Reports() {
         { count: activeSurveysCount },
         { count: activeCommissionsCount }
       ] = await Promise.all([
-        supabase.from('members').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
-        supabase.from('surveys').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
-        supabase.from('commissions').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
-        supabase.from('surveys').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id).eq('status', 'aberta'),
-        supabase.from('commissions').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id).eq('status', 'aberta')
+        db.from('members').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
+        db.from('surveys').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
+        db.from('commissions').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
+        db.from('surveys').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id).eq('status', 'aberta'),
+        db.from('commissions').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id).eq('status', 'aberta')
       ]);
 
       setStats({
