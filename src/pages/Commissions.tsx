@@ -210,7 +210,11 @@ export default function Commissions() {
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {commissions.map((commission) => (
-            <Card key={commission.id}>
+            <Card
+              key={commission.id}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate(`/commissions/${commission.id}`)}
+            >
               <CardHeader>
                 <CardTitle>{commission.nome}</CardTitle>
                 <CardDescription>
@@ -232,7 +236,10 @@ export default function Commissions() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => updateStatus(commission, 'aberta')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateStatus(commission, 'aberta');
+                        }}
                       >
                         Abrir
                       </Button>
@@ -241,7 +248,10 @@ export default function Commissions() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => updateStatus(commission, 'finalizada')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateStatus(commission, 'finalizada');
+                        }}
                       >
                         Finalizar
                       </Button>

@@ -210,7 +210,11 @@ export default function Surveys() {
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {surveys.map((survey) => (
-            <Card key={survey.id}>
+            <Card
+              key={survey.id}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate(`/surveys/${survey.id}`)}
+            >
               <CardHeader>
                 <CardTitle>{survey.titulo}</CardTitle>
                 <CardDescription>
@@ -230,7 +234,10 @@ export default function Surveys() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => toggleStatus(survey)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleStatus(survey);
+                    }}
                   >
                     {survey.status === 'aberta' ? 'Fechar' : 'Reabrir'}
                   </Button>
