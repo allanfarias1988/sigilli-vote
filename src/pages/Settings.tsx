@@ -28,10 +28,7 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // TEMPORARY: Skip auth check for development
     loadData();
   }, [user, navigate]);
 

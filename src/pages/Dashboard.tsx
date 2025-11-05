@@ -17,14 +17,8 @@ export default function Dashboard() {
   const [tenant, setTenant] = useState<any>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-      return;
-    }
-
-    if (user) {
-      loadUserData();
-    }
+    // TEMPORARY: Skip auth check for development
+    loadUserData();
   }, [user, authLoading, navigate]);
 
   const loadUserData = async () => {
@@ -35,9 +29,11 @@ export default function Dashboard() {
         .eq('id', user!.id)
         .single();
 
+      // TEMPORARY: Skip onboarding redirect for development
       if (!profileData) {
-        // No profile exists, redirect to onboarding
-        navigate('/onboarding');
+        setProfile({ nome: 'Usuário de Teste' });
+        setTenant({ nome: 'Igreja de Teste' });
+        setLoading(false);
         return;
       }
 

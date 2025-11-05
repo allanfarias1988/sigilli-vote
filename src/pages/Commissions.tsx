@@ -36,10 +36,7 @@ export default function Commissions() {
   });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // TEMPORARY: Skip auth check for development
     loadData();
   }, [user, navigate]);
 

@@ -36,10 +36,7 @@ export default function Surveys() {
   });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // TEMPORARY: Skip auth check for development
     loadData();
   }, [user, navigate]);
 
