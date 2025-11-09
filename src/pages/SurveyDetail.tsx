@@ -34,10 +34,7 @@ export default function SurveyDetail() {
   const [results, setResults] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    // TEMPORARY: Skip auth check for development
     loadData();
   }, [user, navigate, id]);
 

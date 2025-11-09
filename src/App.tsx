@@ -16,6 +16,7 @@ import CommissionDetail from "./pages/CommissionDetail";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import PublicSurveyVote from "./pages/PublicSurveyVote";
+import PublicCommissionVote from "./pages/PublicCommissionVote";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,7 +40,8 @@ const App = () => (
             <Route path="/commissions/:id" element={<CommissionDetail />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/vote/survey/:code" element={<PublicSurveyVote />} />
+          <Route path="/vote/survey/:code" element={<PublicSurveyVote />} />
+          <Route path="/vote/commission/:code" element={<PublicCommissionVote />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
