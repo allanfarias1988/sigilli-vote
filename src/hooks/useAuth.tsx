@@ -21,28 +21,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // TEMPORARY: Auto-authenticate for development
-    const mockUser = {
-      id: 'local-user-id',
-      email: 'dev@local.com',
-      user_metadata: { nome: 'Usuário de Teste' },
-      app_metadata: {},
-      aud: 'authenticated',
-      created_at: new Date().toISOString()
-    } as unknown as User;
-    
-    const mockSession = {
-      user: mockUser,
-      access_token: 'mock-token',
-      refresh_token: 'mock-refresh'
-    } as unknown as Session;
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = db.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Redirect to onboarding if logged in and not on auth page
+        if (session && event === 'SIGNED_IN') {
+          setTimeout(() => {
+            navigate('/onboarding');
+          }, 0);
+        }
+      }
+    );
 
-    setUser(mockUser);
-    setSession(mockSession);
-    setLoading(false);
+    // THEN check for existing session
+    db.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      
+      // If already logged in, redirect to onboarding
+      if (session) {
+        navigate('/onboarding');
+      }
+    });
 
-    // Set up auth state listener (disabled for development)
-    const subscription = { unsubscribe: () => {} };
     return () => subscription.unsubscribe();
   }, [navigate]);
 
