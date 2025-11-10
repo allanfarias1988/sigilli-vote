@@ -17,28 +17,36 @@ export default function Dashboard() {
   const [tenant, setTenant] = useState<any>(null);
 
   useEffect(() => {
-    // TEMPORARY: Skip auth check for development
-    loadUserData();
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user) {
+      loadUserData();
+    }
+  }, [user, authLoading]);
 
   const loadUserData = async () => {
     try {
+      // Get profile data
       const { data: profileData } = await db
         .from('profiles')
-        .select('*, tenants(*)')
+        .select('*')
         .eq('id', user!.id)
         .single();
 
-      // TEMPORARY: Skip onboarding redirect for development
-      if (!profileData) {
-        setProfile({ nome: 'Usuário de Teste' });
-        setTenant({ nome: 'Igreja de Teste' });
-        setLoading(false);
+      if (!profileData || !profileData.tenant_id) {
+        // Redirect to onboarding if no tenant
+        navigate('/onboarding');
         return;
       }
 
       setProfile(profileData);
-      setTenant(profileData.tenants);
+
+      // Get tenant data
+      const { data: tenantData } = await db
+        .from('tenants')
+        .select('*')
+        .eq('id', profileData.tenant_id)
+        .single();
+
+      setTenant(tenantData);
     } catch (error) {
       console.error('Error loading user data:', error);
       toast({

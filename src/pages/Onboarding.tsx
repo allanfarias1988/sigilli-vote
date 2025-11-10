@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
+const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
 export default function Onboarding() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -33,40 +35,56 @@ export default function Onboarding() {
         .replace(/^-+|-+$/g, '');
 
       // Create tenant
+      const tenantId = generateId();
       const { data: tenantData, error: tenantError } = await db
         .from('tenants')
         .insert({
+          id: tenantId,
           nome: form.nomeIgreja,
-          slug
+          slug,
+          ano_corrente: new Date().getFullYear()
         })
         .select()
         .single();
 
       if (tenantError) throw tenantError;
 
-      // Create profile
+      const finalTenantId = tenantData?.id || tenantId;
+
+      // Update or create profile
       const { error: profileError } = await db
         .from('profiles')
-        .insert({
+        .update({
+          tenant_id: finalTenantId,
+          nome: user!.user_metadata.nome || 'Usuário',
+          email: user!.email,
+          telefone: form.telefone
+        })
+        .eq('id', user!.id);
+
+      if (profileError) {
+        // If update fails, try insert
+        await db.from('profiles').insert({
           id: user!.id,
-          tenant_id: tenantData.id,
-          nome: user!.user_metadata.nome,
+          tenant_id: finalTenantId,
+          nome: user!.user_metadata.nome || 'Usuário',
           email: user!.email,
           telefone: form.telefone
         });
-
-      if (profileError) throw profileError;
+      }
 
       // Assign tenant_admin role
       const { error: roleError } = await db
         .from('user_roles')
         .insert({
           user_id: user!.id,
-          tenant_id: tenantData.id,
+          tenant_id: finalTenantId,
           role: 'tenant_admin'
         });
 
-      if (roleError) throw roleError;
+      if (roleError && !roleError.message?.includes('duplicate')) {
+        throw roleError;
+      }
 
       toast({
         title: 'Sucesso!',
