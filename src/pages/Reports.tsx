@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { db } from '@/lib/db';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ArrowLeft, BarChart3 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Loader2, ArrowLeft, BarChart3 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Reports() {
   const { user } = useAuth();
@@ -17,7 +23,7 @@ export default function Reports() {
     totalSurveys: 0,
     totalCommissions: 0,
     activeSurveys: 0,
-    activeCommissions: 0
+    activeCommissions: 0,
   });
 
   useEffect(() => {
@@ -27,44 +33,43 @@ export default function Reports() {
 
   const loadStats = async () => {
     try {
-      const { data: profile } = await db
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', user!.id)
-        .single();
-
-      if (!profile) {
-        navigate('/onboarding');
-        return;
-      }
+      // Using mock tenant_id directly as there's no real profile in local mode
+      const tenantId = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
 
       const [
-        { count: membersCount },
-        { count: surveysCount },
-        { count: commissionsCount },
-        { count: activeSurveysCount },
-        { count: activeCommissionsCount }
+        { data: membersData },
+        { data: surveysData },
+        { data: commissionsData },
       ] = await Promise.all([
-        db.from('members').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
-        db.from('surveys').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
-        db.from('commissions').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id),
-        db.from('surveys').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id).eq('status', 'aberta'),
-        db.from('commissions').select('*', { count: 'exact', head: true }).eq('tenant_id', profile.tenant_id).eq('status', 'aberta')
+        db.from("members").select("id").eq("tenant_id", tenantId),
+        db.from("surveys").select("id, status").eq("tenant_id", tenantId),
+        db.from("commissions").select("id, status").eq("tenant_id", tenantId),
       ]);
 
+      const totalMembers = membersData?.length || 0;
+      const totalSurveys = surveysData?.length || 0;
+      const totalCommissions = commissionsData?.length || 0;
+
+      const activeSurveys = (surveysData || []).filter(
+        (s) => s.status === "open",
+      ).length;
+      const activeCommissions = (commissionsData || []).filter(
+        (c) => c.status === "open",
+      ).length;
+
       setStats({
-        totalMembers: membersCount || 0,
-        totalSurveys: surveysCount || 0,
-        totalCommissions: commissionsCount || 0,
-        activeSurveys: activeSurveysCount || 0,
-        activeCommissions: activeCommissionsCount || 0
+        totalMembers,
+        totalSurveys,
+        totalCommissions,
+        activeSurveys,
+        activeCommissions,
       });
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error("Error loading stats:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar os relatórios',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível carregar os relatórios",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -83,7 +88,11 @@ export default function Reports() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <header className="border-b bg-card/50 backdrop-blur">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/dashboard")}
+          >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold">Relatórios</h1>
@@ -132,7 +141,7 @@ export default function Reports() {
             <CardContent>
               <p className="text-4xl font-bold">{stats.totalCommissions}</p>
               <p className="text-sm text-muted-foreground mt-2">
-                {stats.activeCommissions} ativas
+                {stats.activeCommissions} abertas
               </p>
             </CardContent>
           </Card>

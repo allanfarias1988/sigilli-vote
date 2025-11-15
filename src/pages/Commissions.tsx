@@ -1,21 +1,34 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { db } from '@/lib/db';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2, Plus, ArrowLeft } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+// src/pages/Commissions.tsx
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Plus, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Commission {
   id: string;
-  nome: string;
-  descricao?: string;
-  ano: number;
+  name: string; // Corrigido de 'nome' para 'name' para consistência
+  description?: string | null; // Corrigido de 'descricao'
+  year: number; // Corrigido de 'ano'
   status: string;
   link_code: string;
   created_at: string;
@@ -30,45 +43,40 @@ export default function Commissions() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
-    nome: '',
-    descricao: '',
-    ano: new Date().getFullYear()
+    name: "",
+    description: "",
+    year: new Date().getFullYear(),
   });
 
+  // Carrega os dados iniciais
   useEffect(() => {
-    // TEMPORARY: Skip auth check for development
-    loadData();
-  }, [user, navigate]);
+    if (user) {
+      // Simulação para obter tenant_id no modo local, já que não temos 'profiles'
+      const localTenantId = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
+      setTenantId(localTenantId);
+      loadData(localTenantId);
+    }
+  }, [user]);
 
-  const loadData = async () => {
+  const loadData = async (tenantId: string) => {
+    if (!tenantId) return;
+    setLoading(true);
     try {
-      const { data: profile } = await db
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', user!.id)
-        .single();
-
-      if (!profile) {
-        navigate('/onboarding');
-        return;
-      }
-
-      setTenantId(profile.tenant_id);
-
+      // CORREÇÃO: Ordem da query
       const { data: commissionsData, error } = await db
-        .from('commissions')
-        .select('*')
-        .eq('tenant_id', profile.tenant_id)
-        .order('created_at', { ascending: false });
+        .from("commissions")
+        .eq("tenant_id", tenantId) // .eq() antes de .select()
+        .select("*");
+      // .order('created_at', { ascending: false }); // .order() será implementado depois
 
       if (error) throw error;
       setCommissions(commissionsData || []);
     } catch (error) {
-      console.error('Error loading commissions:', error);
+      console.error("Error loading commissions:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as comissões',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível carregar as comissões",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -81,58 +89,60 @@ export default function Commissions() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) return;
+    if (!tenantId || !user) return;
 
     try {
-      const { error } = await db
-        .from('commissions')
-        .insert({
-          tenant_id: tenantId,
-          created_by: user!.id,
-          nome: formData.nome,
-          descricao: formData.descricao || null,
-          ano: formData.ano,
-          link_code: generateLinkCode(),
-          status: 'draft' as const
-        });
+      const { error } = await db.from("commissions").insert({
+        tenant_id: tenantId,
+        created_by: user.id,
+        name: formData.name,
+        description: formData.description || null,
+        year: formData.year,
+        link_code: generateLinkCode(),
+        status: "draft" as const,
+      });
 
       if (error) throw error;
 
-      toast({ title: 'Comissão criada com sucesso!' });
+      toast({ title: "Comissão criada com sucesso!" });
       setIsDialogOpen(false);
       setFormData({
-        nome: '',
-        descricao: '',
-        ano: new Date().getFullYear()
+        name: "",
+        description: "",
+        year: new Date().getFullYear(),
       });
-      loadData();
+      loadData(tenantId); // Recarrega os dados
     } catch (error) {
-      console.error('Error creating commission:', error);
+      console.error("Error creating commission:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível criar a comissão',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível criar a comissão",
+        variant: "destructive",
       });
     }
   };
 
-  const updateStatus = async (commission: Commission, newStatus: 'draft' | 'aberta' | 'finalizada') => {
+  const updateStatus = async (
+    commission: Commission,
+    newStatus: "draft" | "open" | "closed",
+  ) => {
     try {
+      // CORREÇÃO: Ordem da query
       const { error } = await db
-        .from('commissions')
-        .update({ status: newStatus })
-        .eq('id', commission.id);
+        .from("commissions")
+        .eq("id", commission.id) // .eq() antes de .update()
+        .update({ status: newStatus });
 
       if (error) throw error;
 
       toast({ title: `Status atualizado para ${newStatus}!` });
-      loadData();
+      if (tenantId) loadData(tenantId);
     } catch (error) {
-      console.error('Error updating commission status:', error);
+      console.error("Error updating commission status:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o status',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível atualizar o status",
+        variant: "destructive",
       });
     }
   };
@@ -150,7 +160,11 @@ export default function Commissions() {
       <header className="border-b bg-card/50 backdrop-blur">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard")}
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-2xl font-bold">Comissões de Nomeação</h1>
@@ -171,8 +185,10 @@ export default function Commissions() {
                   <Label htmlFor="nome">Nome *</Label>
                   <Input
                     id="nome"
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -180,8 +196,10 @@ export default function Commissions() {
                   <Label htmlFor="descricao">Descrição</Label>
                   <Textarea
                     id="descricao"
-                    value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                     rows={3}
                   />
                 </div>
@@ -190,8 +208,13 @@ export default function Commissions() {
                   <Input
                     id="ano"
                     type="number"
-                    value={formData.ano}
-                    onChange={(e) => setFormData({ ...formData, ano: parseInt(e.target.value) })}
+                    value={formData.year}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        year: parseInt(e.target.value),
+                      })
+                    }
                     required
                   />
                 </div>
@@ -213,14 +236,16 @@ export default function Commissions() {
               onClick={() => navigate(`/commissions/${commission.id}`)}
             >
               <CardHeader>
-                <CardTitle>{commission.nome}</CardTitle>
+                <CardTitle>{commission.name}</CardTitle>
                 <CardDescription>
-                  Ano: {commission.ano} • Código: {commission.link_code}
+                  Ano: {commission.year} • Código: {commission.link_code}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {commission.descricao && (
-                  <p className="text-sm text-muted-foreground mb-4">{commission.descricao}</p>
+                {commission.description && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {commission.description}
+                  </p>
                 )}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -229,25 +254,25 @@ export default function Commissions() {
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {commission.status === 'draft' && (
+                    {commission.status === "draft" && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          updateStatus(commission, 'aberta');
+                          updateStatus(commission, "open");
                         }}
                       >
                         Abrir
                       </Button>
                     )}
-                    {commission.status === 'aberta' && (
+                    {commission.status === "open" && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          updateStatus(commission, 'finalizada');
+                          updateStatus(commission, "closed");
                         }}
                       >
                         Finalizar
@@ -262,7 +287,9 @@ export default function Commissions() {
 
         {commissions.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Nenhuma comissão criada ainda.</p>
+            <p className="text-muted-foreground">
+              Nenhuma comissão criada ainda.
+            </p>
           </div>
         )}
       </main>

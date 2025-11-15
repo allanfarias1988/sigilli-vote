@@ -1,71 +1,152 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate, useParams } from 'react-router-dom';
-import { db } from '@/lib/db';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2, ArrowLeft, Plus, Trash2, QrCode, Link as LinkIcon } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// src/pages/CommissionDetail.tsx
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate, useParams } from "react-router-dom";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Loader2,
+  ArrowLeft,
+  Plus,
+  Trash2,
+  QrCode,
+  Link as LinkIcon,
+  RefreshCw,
+  Lock,
+  Vote,
+  Printer,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { QRCodeSVG } from "qrcode.react";
+
+// Tipos baseados no nosso localStorage/client.ts
+interface Commission {
+  id: string;
+  name: string;
+  description: string | null;
+  year: number;
+  link_code: string;
+  status: string; // Adicionado para lidar com o status
+  finalized_at: string | null; // Adicionado para consistência
+}
 
 interface CommissionRole {
   id: string;
-  nome_cargo: string;
-  max_selecoes: number;
-  ordem: number;
-  ativo: boolean;
+  commission_id: string;
+  role_name: string;
+  max_selections: number;
+  order: number;
+  is_active: boolean;
+}
+
+interface VoteResult {
+  roleName: string;
+  votes: {
+    memberId: string;
+    memberName: string;
+    count: number;
+  }[];
 }
 
 export default function CommissionDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [commission, setCommission] = useState<any>(null);
+  const [commission, setCommission] = useState<Commission | null>(null);
   const [roles, setRoles] = useState<CommissionRole[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
+  const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
-    nome_cargo: '',
-    max_selecoes: 2
+    role_name: "",
+    max_selections: 1,
   });
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<VoteResult[]>([]);
+  const [confirmationCode, setConfirmationCode] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [availableSurveys, setAvailableSurveys] = useState<any[]>([]);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null);
+  const [selectedIdentificationMode, setSelectedIdentificationMode] = useState<string>("anonymous");
 
   useEffect(() => {
-    // TEMPORARY: Skip auth check for development
-    loadData();
-  }, [user, navigate, id]);
+    if (id) {
+      loadData();
+      loadAvailableSurveys();
+    }
+  }, [id]);
+
+  const loadAvailableSurveys = async () => {
+    try {
+      const { data, error } = await db.from("surveys").select("id, title");
+      if (error) throw error;
+      setAvailableSurveys(data || []);
+    } catch (error) {
+      console.error("Error loading available surveys:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as pesquisas disponíveis.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const { data: commissionData, error: commissionError } = await db
-        .from('commissions')
-        .select('*')
-        .eq('id', id)
+        .from("commissions")
+        .eq("id", id)
+        .select("*")
         .single();
 
       if (commissionError) throw commissionError;
       setCommission(commissionData);
+      setSelectedSurveyId(commissionData.survey_id);
+      setSelectedIdentificationMode(commissionData.identification_mode || "anonymous");
 
       const { data: rolesData, error: rolesError } = await db
-        .from('commission_roles')
-        .select('*')
-        .eq('commission_id', id)
-        .order('ordem');
+        .from("commission_roles")
+        .eq("commission_id", id)
+        .select("*");
 
       if (rolesError) throw rolesError;
       setRoles(rolesData || []);
 
+      // Carrega os resultados ao iniciar
       await loadResults();
     } catch (error) {
-      console.error('Error loading commission:', error);
+      console.error("Error loading commission details:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar a comissão',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível carregar os detalhes da comissão",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -73,94 +154,236 @@ export default function CommissionDetail() {
   };
 
   const loadResults = async () => {
+    if (!id) return;
     try {
-      const { data: ballotsData } = await db
-        .from('ballots')
-        .select('*, commission_roles(nome_cargo), votes(member_id, members(nome_completo))')
-        .eq('commission_id', id);
+      // 1. Buscar todos os membros para mapear IDs para nomes
+      const { data: members, error: membersError } = await db
+        .from("members")
+        .select("id, full_name");
+      if (membersError) throw membersError;
+      const memberMap = new Map(members?.map((m) => [m.id, m.full_name]));
 
-      if (ballotsData) {
-        const grouped = ballotsData.reduce((acc: any, ballot: any) => {
-          const role = ballot.commission_roles?.nome_cargo || 'Desconhecido';
-          if (!acc[role]) {
-            acc[role] = {};
-          }
-          ballot.votes?.forEach((vote: any) => {
-            const member = vote.members?.nome_completo || 'Desconhecido';
-            acc[role][member] = (acc[role][member] || 0) + 1;
-          });
-          return acc;
-        }, {});
+      // 2. Buscar todos os cargos da comissão para mapear IDs para nomes
+      const { data: roles, error: rolesError } = await db
+        .from("commission_roles")
+        .eq("commission_id", id)
+        .select("id, role_name");
+      if (rolesError) throw rolesError;
+      const roleMap = new Map(roles?.map((r) => [r.id, r.role_name]));
 
-        setResults(Object.entries(grouped).map(([role, votes]: [string, any]) => ({
-          role,
-          votes: Object.entries(votes)
-            .map(([member, count]) => ({ member, count }))
-            .sort((a: any, b: any) => b.count - a.count)
-        })));
+      // 3. Buscar todas as cédulas (ballots) da comissão
+      const { data: ballots, error: ballotsError } = await db
+        .from("ballots")
+        .eq("commission_id", id)
+        .select("id, role_id");
+      if (ballotsError) throw ballotsError;
+      if (!ballots || ballots.length === 0) {
+        setResults([]); // Sem cédulas, sem resultados
+        return;
       }
+
+      // 4. Buscar todos os votos associados a essas cédulas
+      const ballotIds = ballots.map((b) => b.id);
+      const allVotes = [];
+      // Simulação de \'in\' filter, pois não o implementamos
+      for (const ballotId of ballotIds) {
+        const { data: votes, error: votesError } = await db
+          .from("votes")
+          .eq("ballot_id", ballotId)
+          .select("member_id");
+        if (votesError) throw votesError;
+        if (votes) allVotes.push(...votes);
+      }
+
+      // 5. Agregar os resultados
+      const voteCounts: { [roleId: string]: { [memberId: string]: number } } =
+        {};
+
+      for (const ballot of ballots) {
+        if (!voteCounts[ballot.role_id]) {
+          voteCounts[ballot.role_id] = {};
+        }
+        const votesForBallot = allVotes.filter(
+          (v) => v.ballot_id === ballot.id,
+        );
+        for (const vote of votesForBallot) {
+          if (!voteCounts[ballot.role_id][vote.member_id]) {
+            voteCounts[ballot.role_id][vote.member_id] = 0;
+          }
+          voteCounts[ballot.role_id][vote.member_id]++;
+        }
+      }
+
+      const formattedResults = Object.entries(voteCounts).map(
+        ([roleId, memberVotes]) => {
+          return {
+            roleName: roleMap.get(roleId) || "Cargo Desconhecido",
+            votes: Object.entries(memberVotes)
+              .map(([memberId, count]) => ({
+                memberId,
+                memberName: memberMap.get(memberId) || "Membro Desconhecido",
+                count,
+              }))
+              .sort((a, b) => b.count - a.count), // Ordena por mais votado
+          };
+        },
+      );
+
+      setResults(formattedResults);
     } catch (error) {
-      console.error('Error loading results:', error);
+      console.error("Error loading results:", error);
+      toast({ title: "Erro ao carregar resultados", variant: "destructive" });
     }
   };
 
   const handleAddRole = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!id) return;
 
     try {
-      const { error } = await db
-        .from('commission_roles')
-        .insert({
-          commission_id: id,
-          nome_cargo: formData.nome_cargo,
-          max_selecoes: formData.max_selecoes,
-          ordem: roles.length + 1,
-          ativo: true
-        });
+      const { error } = await db.from("commission_roles").insert({
+        commission_id: id,
+        role_name: formData.role_name,
+        max_selections: formData.max_selections,
+        order: roles.length + 1,
+        is_active: true,
+      });
 
       if (error) throw error;
 
-      toast({ title: 'Cargo adicionado com sucesso!' });
-      setIsDialogOpen(false);
-      setFormData({ nome_cargo: '', max_selecoes: 2 });
+      toast({ title: "Cargo adicionado com sucesso!" });
+      setIsAddRoleDialogOpen(false); // Usar o estado correto
+      setFormData({ role_name: "", max_selections: 1 });
       loadData();
     } catch (error) {
-      console.error('Error adding role:', error);
+      console.error("Error adding role:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível adicionar o cargo',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível adicionar o cargo",
+        variant: "destructive",
       });
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este cargo?')) return;
+    if (!confirm("Tem certeza que deseja excluir este cargo?")) return;
 
     try {
       const { error } = await db
-        .from('commission_roles')
-        .delete()
-        .eq('id', roleId);
+        .from("commission_roles")
+        .eq("id", roleId)
+        .delete();
 
       if (error) throw error;
 
-      toast({ title: 'Cargo excluído com sucesso!' });
+      toast({ title: "Cargo excluído com sucesso!" });
       loadData();
     } catch (error) {
-      console.error('Error deleting role:', error);
+      console.error("Error deleting role:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível excluir o cargo',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível excluir o cargo",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const generateConfirmationCode = () => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedCode(code);
+    return code;
+  };
+
+  const handleOpenFinalizeDialog = () => {
+    generateConfirmationCode();
+    setIsFinalizeDialogOpen(true);
+  };
+
+  const handleFinalizeCommission = async () => {
+    if (!id || !commission) return;
+
+    if (confirmationCode !== generatedCode) {
+      toast({
+        title: "Erro",
+        description: "Código de confirmação incorreto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await db
+        .from("commissions")
+        .eq("id", id)
+        .update({
+          status: "closed",
+          finalized_at: new Date().toISOString(),
+        });
+
+      if (error) throw error;
+
+      toast({ title: "Comissão finalizada com sucesso!" });
+      setIsFinalizeDialogOpen(false);
+      loadData(); // Recarrega os dados para refletir o novo status
+    } catch (error) {
+      console.error("Error finalizing commission:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível finalizar a comissão.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateCommissionSurvey = async () => {
+    if (!id) return;
+    try {
+      const { error } = await db
+        .from("commissions")
+        .eq("id", id)
+        .update({ survey_id: selectedSurveyId });
+
+      if (error) throw error;
+
+      toast({ title: "Pesquisa vinculada com sucesso!" });
+      loadData();
+    } catch (error) {
+      console.error("Error updating commission survey:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível vincular a pesquisa à comissão.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateIdentificationMode = async () => {
+    if (!id) return;
+    try {
+      const { error } = await db
+        .from("commissions")
+        .eq("id", id)
+        .update({ identification_mode: selectedIdentificationMode });
+
+      if (error) throw error;
+
+      toast({ title: "Modo de identificação atualizado com sucesso!" });
+      loadData();
+    } catch (error) {
+      console.error("Error updating identification mode:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o modo de identificação.",
+        variant: "destructive",
       });
     }
   };
 
   const copyLink = () => {
+    if (!commission) return;
     const link = `${window.location.origin}/vote/commission/${commission.link_code}`;
     navigator.clipboard.writeText(link);
-    toast({ title: 'Link copiado para a área de transferência!' });
+    toast({ title: "Link copiado para a área de transferência!" });
   };
 
   if (loading) {
@@ -179,31 +402,168 @@ export default function CommissionDetail() {
     );
   }
 
+  const isCommissionFinalized = commission.status === "closed";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <header className="border-b bg-card/50 backdrop-blur">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/commissions')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/commissions")}
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{commission.nome}</h1>
-              <p className="text-sm text-muted-foreground">Código: {commission.link_code}</p>
+              <h1 className="text-2xl font-bold">{commission.name}</h1>
+              <p className="text-sm text-muted-foreground">
+                Código: {commission.link_code}
+              </p>
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate(`/commissions/${id}/vote`)}
+            >
+              <Vote className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="icon" onClick={copyLink}>
               <LinkIcon className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <QrCode className="h-4 w-4" />
-            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>QR Code para Votação</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center justify-center">
+                  <QRCodeSVG
+                    value={`${window.location.origin}/vote/commission/${commission.link_code}`}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+            {!isCommissionFinalized && ( // Botão de finalizar visível apenas se não finalizada
+              <Dialog
+                open={isFinalizeDialogOpen}
+                onOpenChange={setIsFinalizeDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    onClick={handleOpenFinalizeDialog}
+                  >
+                    <Lock className="h-4 w-4 mr-2" />
+                    Finalizar Comissão
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      Finalizar Comissão Irreversivelmente
+                    </DialogTitle>
+                    <DialogDescription>
+                      Esta ação é irreversível. Após finalizar, os dados da
+                      comissão não poderão ser alterados. Por favor, digite o
+                      código de 6 dígitos abaixo para confirmar.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-center text-lg font-bold text-destructive">
+                      Código de Confirmação: {generatedCode}
+                    </p>
+                    <div>
+                      <Label htmlFor="confirmation-code">
+                        Digite o código para confirmar
+                      </Label>
+                      <Input
+                        id="confirmation-code"
+                        type="text"
+                        maxLength={6}
+                        value={confirmationCode}
+                        onChange={(e) => setConfirmationCode(e.target.value)}
+                        placeholder="______"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="destructive"
+                      onClick={handleFinalizeCommission}
+                      disabled={confirmationCode !== generatedCode}
+                    >
+                      Confirmar Finalização
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <Label htmlFor="survey-select">Vincular Pesquisa de Sugestões</Label>
+          <Select
+            value={selectedSurveyId || ""}
+            onValueChange={(value) => setSelectedSurveyId(value)}
+            disabled={isCommissionFinalized}
+          >
+            <SelectTrigger id="survey-select" className="w-[240px]">
+              <SelectValue placeholder="Selecionar Pesquisa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Nenhuma</SelectItem>
+              {availableSurveys.map((survey) => (
+                <SelectItem key={survey.id} value={survey.id}>
+                  {survey.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleUpdateCommissionSurvey}
+            disabled={isCommissionFinalized}
+            className="ml-2"
+          >
+            Vincular
+          </Button>
+        </div>
+
+        <div className="mb-6">
+          <Label htmlFor="identification-mode-select">Modo de Identificação</Label>
+          <Select
+            value={selectedIdentificationMode}
+            onValueChange={(value) => setSelectedIdentificationMode(value)}
+            disabled={isCommissionFinalized}
+          >
+            <SelectTrigger id="identification-mode-select" className="w-[240px]">
+              <SelectValue placeholder="Selecionar Modo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="anonymous">Anônimo</SelectItem>
+              <SelectItem value="optional">Opcional</SelectItem>
+              <SelectItem value="mandatory">Obrigatório</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleUpdateIdentificationMode}
+            disabled={isCommissionFinalized}
+            className="ml-2"
+          >
+            Atualizar Modo
+          </Button>
+        </div>
+
         <Tabs defaultValue="roles" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="roles">Cargos</TabsTrigger>
@@ -211,99 +571,135 @@ export default function CommissionDetail() {
           </TabsList>
 
           <TabsContent value="roles" className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mt-4">
               <h2 className="text-xl font-semibold">Cargos da Comissão</h2>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar Cargo
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Novo Cargo</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleAddRole} className="space-y-4">
-                    <div>
-                      <Label htmlFor="nome_cargo">Nome do Cargo *</Label>
-                      <Input
-                        id="nome_cargo"
-                        value={formData.nome_cargo}
-                        onChange={(e) => setFormData({ ...formData, nome_cargo: e.target.value })}
-                        placeholder="Ex: Ancião, Diácono, Tesoureiro..."
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="max_selecoes">Máximo de Seleções</Label>
-                      <Input
-                        id="max_selecoes"
-                        type="number"
-                        value={formData.max_selecoes}
-                        onChange={(e) => setFormData({ ...formData, max_selecoes: parseInt(e.target.value) })}
-                        min={1}
-                        required
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      Adicionar
+              {!isCommissionFinalized && ( // Adicionar cargo visível apenas se não finalizada
+                <Dialog
+                  open={isAddRoleDialogOpen}
+                  onOpenChange={setIsAddRoleDialogOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar Cargo
                     </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Novo Cargo</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleAddRole} className="space-y-4">
+                      <div>
+                        <Label htmlFor="role_name">Nome do Cargo *</Label>
+                        <Input
+                          id="role_name"
+                          value={formData.role_name}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              role_name: e.target.value,
+                            })
+                          }
+                          placeholder="Ex: Ancião, Diácono..."
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="max_selections">Máximo de Seleções</Label>
+                        <Input
+                          id="max_selections"
+                          type="number"
+                          value={formData.max_selections}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              max_selections: parseInt(e.target.value),
+                            })
+                          }
+                          min={1}
+                          required
+                        />
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Adicionar
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {roles.map((role) => (
                 <Card key={role.id}>
                   <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>{role.nome_cargo}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteRole(role.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <CardTitle className="flex items-center justify-between text-lg">
+                      <span>{role.role_name}</span>
+                      {!isCommissionFinalized && ( // Deletar cargo visível apenas se não finalizada
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteRole(role.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </CardTitle>
+                    <CardDescription>
+                      Máx. seleções: {role.max_selecoes}
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Máximo de seleções: {role.max_selecoes}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Status: {role.ativo ? 'Ativo' : 'Inativo'}
-                    </p>
-                  </CardContent>
                 </Card>
               ))}
             </div>
-
             {roles.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-muted-foreground">Nenhum cargo adicionado ainda.</p>
+                <p className="text-muted-foreground">
+                  Nenhum cargo adicionado ainda.
+                </p>
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="results" className="space-y-6">
-            <h2 className="text-xl font-semibold">Resultados da Votação</h2>
+            <div className="flex justify-between items-center mt-4">
+              <h2 className="text-xl font-semibold">Resultados da Votação</h2>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={loadResults}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar
+                </Button>
+                {isCommissionFinalized && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/commissions/${id}/print`)}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Imprimir Resultados
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {results.length > 0 ? (
               <div className="space-y-6">
                 {results.map((result) => (
-                  <Card key={result.role}>
+                  <Card key={result.roleName}>
                     <CardHeader>
-                      <CardTitle>{result.role}</CardTitle>
+                      <CardTitle>{result.roleName}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {result.votes.map((vote: any, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                            <span>{vote.member}</span>
-                            <span className="font-semibold">{vote.count} votos</span>
+                        {result.votes.map((vote) => (
+                          <div
+                            key={vote.memberId}
+                            className="flex justify-between items-center p-2 bg-muted/50 rounded-lg"
+                          >
+                            <span>{vote.memberName}</span>
+                            <span className="font-semibold">
+                              {vote.count} voto(s)
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -313,7 +709,9 @@ export default function CommissionDetail() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-muted-foreground">Nenhum voto registrado ainda.</p>
+                <p className="text-muted-foreground">
+                  Nenhum voto registrado ainda.
+                </p>
               </div>
             )}
           </TabsContent>

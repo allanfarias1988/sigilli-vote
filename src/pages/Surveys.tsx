@@ -1,24 +1,38 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { db } from '@/lib/db';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2, Plus, ArrowLeft } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+// src/pages/Surveys.tsx
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Plus, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
+// Interface alinhada com o schema do localStorage/client.ts
 interface Survey {
   id: string;
-  titulo: string;
-  descricao?: string;
-  ano: number;
-  status: string;
+  title: string;
+  description?: string | null;
+  status: "open" | "closed";
   link_code: string;
   created_at: string;
+  tenant_id: string;
 }
 
 export default function Surveys() {
@@ -29,46 +43,38 @@ export default function Surveys() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Estado do formulário alinhado com a interface Survey
   const [formData, setFormData] = useState({
-    titulo: '',
-    descricao: '',
-    ano: new Date().getFullYear()
+    title: "",
+    description: "",
   });
 
   useEffect(() => {
-    // TEMPORARY: Skip auth check for development
-    loadData();
-  }, [user, navigate]);
+    // Simulação para obter tenant_id no modo local
+    const localTenantId = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
+    setTenantId(localTenantId);
+    loadData(localTenantId);
+  }, []);
 
-  const loadData = async () => {
+  const loadData = async (tenantId: string) => {
+    setLoading(true);
     try {
-      const { data: profile } = await db
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', user!.id)
-        .single();
-
-      if (!profile) {
-        navigate('/onboarding');
-        return;
-      }
-
-      setTenantId(profile.tenant_id);
-
+      // CORREÇÃO: Ordem da query
       const { data: surveysData, error } = await db
-        .from('surveys')
-        .select('*')
-        .eq('tenant_id', profile.tenant_id)
-        .order('created_at', { ascending: false });
+        .from("surveys")
+        .eq("tenant_id", tenantId)
+        .select("*");
+      // .order('created_at', { ascending: false }); // .order() a ser implementado
 
       if (error) throw error;
       setSurveys(surveysData || []);
     } catch (error) {
-      console.error('Error loading surveys:', error);
+      console.error("Error loading surveys:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as pesquisas',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível carregar as pesquisas",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -76,7 +82,7 @@ export default function Surveys() {
   };
 
   const generateLinkCode = () => {
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
+    return `SURV${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,55 +90,52 @@ export default function Surveys() {
     if (!tenantId) return;
 
     try {
-      const { error } = await db
-        .from('surveys')
-        .insert({
-          tenant_id: tenantId,
-          titulo: formData.titulo,
-          descricao: formData.descricao || null,
-          ano: formData.ano,
-          link_code: generateLinkCode(),
-          status: 'aberta'
-        });
+      const { error } = await db.from("surveys").insert({
+        tenant_id: tenantId,
+        title: formData.title,
+        description: formData.description || null,
+        link_code: generateLinkCode(),
+        status: "open",
+      });
 
       if (error) throw error;
 
-      toast({ title: 'Pesquisa criada com sucesso!' });
+      toast({ title: "Pesquisa criada com sucesso!" });
       setIsDialogOpen(false);
-      setFormData({
-        titulo: '',
-        descricao: '',
-        ano: new Date().getFullYear()
-      });
-      loadData();
+      setFormData({ title: "", description: "" });
+      loadData(tenantId);
     } catch (error) {
-      console.error('Error creating survey:', error);
+      console.error("Error creating survey:", error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível criar a pesquisa',
-        variant: 'destructive'
+        title: "Erro",
+        description: "Não foi possível criar a pesquisa",
+        variant: "destructive",
       });
     }
   };
 
   const toggleStatus = async (survey: Survey) => {
+    if (!tenantId) return;
     try {
-      const newStatus = survey.status === 'aberta' ? 'fechada' : 'aberta';
+      const newStatus = survey.status === "open" ? "closed" : "open";
+      // CORREÇÃO: Ordem da query
       const { error } = await db
-        .from('surveys')
-        .update({ status: newStatus })
-        .eq('id', survey.id);
+        .from("surveys")
+        .eq("id", survey.id)
+        .update({ status: newStatus });
 
       if (error) throw error;
 
-      toast({ title: `Pesquisa ${newStatus === 'aberta' ? 'reaberta' : 'fechada'} com sucesso!` });
-      loadData();
-    } catch (error) {
-      console.error('Error updating survey status:', error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar o status',
-        variant: 'destructive'
+        title: `Pesquisa ${newStatus === "open" ? "reaberta" : "fechada"} com sucesso!`,
+      });
+      loadData(tenantId);
+    } catch (error) {
+      console.error("Error updating survey status:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status",
+        variant: "destructive",
       });
     }
   };
@@ -150,7 +153,11 @@ export default function Surveys() {
       <header className="border-b bg-card/50 backdrop-blur">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard")}
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-2xl font-bold">Pesquisas de Sugestões</h1>
@@ -164,35 +171,29 @@ export default function Surveys() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Nova Pesquisa</DialogTitle>
+                <DialogTitle>Nova Pesquisa de Sugestões</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="titulo">Título *</Label>
+                  <Label htmlFor="title">Título *</Label>
                   <Input
-                    id="titulo"
-                    value={formData.titulo}
-                    onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="descricao">Descrição</Label>
+                  <Label htmlFor="description">Descrição</Label>
                   <Textarea
-                    id="descricao"
-                    value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
                     rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ano">Ano</Label>
-                  <Input
-                    id="ano"
-                    type="number"
-                    value={formData.ano}
-                    onChange={(e) => setFormData({ ...formData, ano: parseInt(e.target.value) })}
-                    required
                   />
                 </div>
                 <Button type="submit" className="w-full">
@@ -213,20 +214,24 @@ export default function Surveys() {
               onClick={() => navigate(`/surveys/${survey.id}`)}
             >
               <CardHeader>
-                <CardTitle>{survey.titulo}</CardTitle>
-                <CardDescription>
-                  Ano: {survey.ano} • Código: {survey.link_code}
-                </CardDescription>
+                <CardTitle>{survey.title}</CardTitle>
+                <CardDescription>Código: {survey.link_code}</CardDescription>
               </CardHeader>
               <CardContent>
-                {survey.descricao && (
-                  <p className="text-sm text-muted-foreground mb-4">{survey.descricao}</p>
+                {survey.description && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {survey.description}
+                  </p>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm font-medium ${
-                    survey.status === 'aberta' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {survey.status === 'aberta' ? 'Aberta' : 'Fechada'}
+                  <span
+                    className={`text-sm font-medium ${
+                      survey.status === "open"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {survey.status === "open" ? "Aberta" : "Fechada"}
                   </span>
                   <Button
                     variant="outline"
@@ -236,7 +241,7 @@ export default function Surveys() {
                       toggleStatus(survey);
                     }}
                   >
-                    {survey.status === 'aberta' ? 'Fechar' : 'Reabrir'}
+                    {survey.status === "open" ? "Fechar" : "Reabrir"}
                   </Button>
                 </div>
               </CardContent>
@@ -246,7 +251,9 @@ export default function Surveys() {
 
         {surveys.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Nenhuma pesquisa criada ainda.</p>
+            <p className="text-muted-foreground">
+              Nenhuma pesquisa criada ainda.
+            </p>
           </div>
         )}
       </main>

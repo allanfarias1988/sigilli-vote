@@ -1,18 +1,32 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { db } from '@/lib/db';
-import { useNavigate } from 'react-router-dom';
+// src/hooks/useAuth.tsx
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/db"; // Usamos 'supabase' para as chamadas reais
+import { db as localStorageDB } from "@/integrations/localStorage/client"; // Importamos o cliente local diretamente
+import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    nome: string,
+  ) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const isLocal = import.meta.env.VITE_DATA_SOURCE === "local";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -21,72 +35,136 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // TEMPORARY: Auto-authenticate for development with localStorage
-    const mockUser = {
-      id: 'local-user-id',
-      email: 'dev@local.com',
-      user_metadata: { nome: 'Usuário de Teste' },
-      app_metadata: {},
-      aud: 'authenticated',
-      created_at: new Date().toISOString()
-    } as unknown as User;
-    
-    const mockSession = {
-      user: mockUser,
-      access_token: 'mock-token',
-      refresh_token: 'mock-refresh'
-    } as unknown as Session;
+    if (isLocal) {
+      // Em modo local, verificamos se já existe uma sessão mockada no sessionStorage
+      const mockSessionString = sessionStorage.getItem("signa-mock-session");
+      if (mockSessionString) {
+        const mockSession = JSON.parse(mockSessionString);
+        setUser(mockSession.user);
+        setSession(mockSession);
+      }
+      setLoading(false);
+    } else {
+      // Em modo Supabase, usamos o listener de autenticação real
+      const getSession = async () => {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      };
+      getSession();
 
-    setUser(mockUser);
-    setSession(mockSession);
-    setLoading(false);
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      });
 
-    // Set up auth state listener (disabled for development)
-    const subscription = { unsubscribe: () => {} };
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+      return () => subscription.unsubscribe();
+    }
+  }, []);
+
+  // --- Funções de Autenticação Híbridas ---
 
   const signUp = async (email: string, password: string, nome: string) => {
-    try {
-      const { error } = await db.auth.signUp({
+    if (isLocal) {
+      // LÓGICA LOCAL
+      console.log("Executando signUp local...");
+      const { data: existingUsers, error: selectError } = await localStorageDB
+        .from("users")
+        .eq("email", email) // CORREÇÃO: .eq() ANTES de .select()
+        .select();
+
+      if (selectError) return { error: selectError };
+      if (existingUsers && existingUsers.length > 0) {
+        return { error: new Error("Este email já está cadastrado.") };
+      }
+
+      const { data: newUser, error: insertError } = await localStorageDB
+        .from("users")
+        .insert({
+          email,
+          name: nome,
+          role: "commission_admin", // Padrão para novos cadastros locais
+        });
+
+      if (insertError) return { error: insertError };
+
+      // Simula login automático após o cadastro
+      await signIn(email, password);
+
+      return { error: null };
+    } else {
+      // LÓGICA SUPABASE
+      const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            nome
-          }
-        }
+        options: { data: { nome } },
       });
-      
-      if (error) return { error };
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
+      return { error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await db.auth.signInWithPassword({
-        email,
-        password
-      });
-      
+    if (isLocal) {
+      // LÓGICA LOCAL
+      console.log("Executando signIn local...");
+      const { data: users, error } = await localStorageDB
+        .from("users")
+        .eq("email", email) // CORREÇÃO: .eq() ANTES de .select()
+        .select();
+
       if (error) return { error };
+      if (!users || users.length === 0) {
+        return { error: new Error("Credenciais inválidas.") };
+      }
+
+      const userToLogin = users[0] as unknown as User;
+
+      const mockSession = {
+        user: userToLogin,
+        access_token: `mock-token-${Date.now()}`,
+        refresh_token: `mock-refresh-${Date.now()}`,
+      } as unknown as Session;
+
+      sessionStorage.setItem("signa-mock-session", JSON.stringify(mockSession));
+      setUser(userToLogin);
+      setSession(mockSession);
+
+      navigate("/dashboard"); // Redireciona para o dashboard após o login
       return { error: null };
-    } catch (error) {
-      return { error: error as Error };
+    } else {
+      // LÓGICA SUPABASE
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (!error) navigate("/dashboard");
+      return { error };
     }
   };
 
   const signOut = async () => {
-    await db.auth.signOut();
-    navigate('/auth');
+    if (isLocal) {
+      // LÓGICA LOCAL
+      console.log("Executando signOut local...");
+      sessionStorage.removeItem("signa-mock-session");
+      setUser(null);
+      setSession(null);
+    } else {
+      // LÓGICA SUPABASE
+      await supabase.auth.signOut();
+    }
+    navigate("/auth");
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signUp, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -95,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
