@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   ArrowLeft,
@@ -44,11 +45,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { QRCodeSVG } from "qrcode.react";
+import { RolesManager } from "@/components/RolesManager";
+import { FinalizationDialog } from "@/components/FinalizationDialog";
 
 // Tipos baseados no nosso localStorage/client.ts
 interface Commission {
   id: string;
   name: string;
+  nome: string; // Adicionado para compatibilidade com FinalizationDialog
   description: string | null;
   year: number;
   link_code: string;
@@ -127,7 +131,12 @@ export default function CommissionDetail() {
         .single();
 
       if (commissionError) throw commissionError;
-      setCommission(commissionData);
+      // Adicionar campo 'nome' para compatibilidade com FinalizationDialog
+      const commissionWithNome = {
+        ...commissionData,
+        nome: commissionData.name || ""
+      };
+      setCommission(commissionWithNome);
       setSelectedSurveyId(commissionData.survey_id);
       setSelectedIdentificationMode(commissionData.identification_mode || "anonymous");
 
@@ -417,7 +426,12 @@ export default function CommissionDetail() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{commission.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold">{commission.name}</h1>
+                {isCommissionFinalized && (
+                  <Badge variant="destructive">FINALIZADA</Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 Código: {commission.link_code}
               </p>
@@ -451,60 +465,11 @@ export default function CommissionDetail() {
                 </div>
               </DialogContent>
             </Dialog>
-            {!isCommissionFinalized && ( // Botão de finalizar visível apenas se não finalizada
-              <Dialog
-                open={isFinalizeDialogOpen}
-                onOpenChange={setIsFinalizeDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    onClick={handleOpenFinalizeDialog}
-                  >
-                    <Lock className="h-4 w-4 mr-2" />
-                    Finalizar Comissão
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>
-                      Finalizar Comissão Irreversivelmente
-                    </DialogTitle>
-                    <DialogDescription>
-                      Esta ação é irreversível. Após finalizar, os dados da
-                      comissão não poderão ser alterados. Por favor, digite o
-                      código de 6 dígitos abaixo para confirmar.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <p className="text-center text-lg font-bold text-destructive">
-                      Código de Confirmação: {generatedCode}
-                    </p>
-                    <div>
-                      <Label htmlFor="confirmation-code">
-                        Digite o código para confirmar
-                      </Label>
-                      <Input
-                        id="confirmation-code"
-                        type="text"
-                        maxLength={6}
-                        value={confirmationCode}
-                        onChange={(e) => setConfirmationCode(e.target.value)}
-                        placeholder="______"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="destructive"
-                      onClick={handleFinalizeCommission}
-                      disabled={confirmationCode !== generatedCode}
-                    >
-                      Confirmar Finalização
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+            {!isCommissionFinalized && (
+              <FinalizationDialog
+                commission={commission}
+                onFinalize={loadData}
+              />
             )}
           </div>
         </div>
@@ -573,59 +538,8 @@ export default function CommissionDetail() {
           <TabsContent value="roles" className="space-y-6">
             <div className="flex justify-between items-center mt-4">
               <h2 className="text-xl font-semibold">Cargos da Comissão</h2>
-              {!isCommissionFinalized && ( // Adicionar cargo visível apenas se não finalizada
-                <Dialog
-                  open={isAddRoleDialogOpen}
-                  onOpenChange={setIsAddRoleDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Adicionar Cargo
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Novo Cargo</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleAddRole} className="space-y-4">
-                      <div>
-                        <Label htmlFor="role_name">Nome do Cargo *</Label>
-                        <Input
-                          id="role_name"
-                          value={formData.role_name}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              role_name: e.target.value,
-                            })
-                          }
-                          placeholder="Ex: Ancião, Diácono..."
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="max_selections">Máximo de Seleções</Label>
-                        <Input
-                          id="max_selections"
-                          type="number"
-                          value={formData.max_selections}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              max_selections: parseInt(e.target.value),
-                            })
-                          }
-                          min={1}
-                          required
-                        />
-                      </div>
-                      <Button type="submit" className="w-full">
-                        Adicionar
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+              {!isCommissionFinalized && (
+                <RolesManager commissionId={id!} onRolesUpdated={loadData} />
               )}
             </div>
 
@@ -717,6 +631,6 @@ export default function CommissionDetail() {
           </TabsContent>
         </Tabs>
       </main>
-    </div>
+    </div >
   );
 }
