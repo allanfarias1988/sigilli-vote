@@ -16,6 +16,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { searchMembers } from "@/lib/search-utils";
 
 // Tipos baseados no nosso localStorage/client.ts
 interface Commission {
@@ -67,6 +69,18 @@ export default function VotingSession() {
       loadMembers();
     }
   }, [commissionId]);
+
+  // Verificar se comissão está finalizada e redirecionar
+  useEffect(() => {
+    if (commission && (commission.status === 'finalizada' || commission.status === 'closed')) {
+      toast({
+        title: 'Comissão Finalizada',
+        description: 'Esta comissão já foi finalizada e não aceita mais votos.',
+        variant: 'destructive'
+      });
+      navigate(`/commissions/${commissionId}`);
+    }
+  }, [commission, commissionId, navigate, toast]);
 
   useEffect(() => {
     if (commission?.survey_id) {
@@ -310,12 +324,13 @@ export default function VotingSession() {
     ? getRankedMembers(currentRole, members, surveyItems, surveyVotes)
     : [];
 
-  const filteredRankedMembers = allRankedMembers.filter(
-    (member) =>
-      member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (member.nickname &&
-        member.nickname.toLowerCase().includes(searchTerm.toLowerCase())),
-  );
+  // Usar busca conforme RF-05: prioriza primeiro nome, fallback para sobrenomes
+  const filteredRankedMembers = searchTerm.trim()
+    ? searchMembers(
+      allRankedMembers.map(m => ({ ...m, nome_completo: m.full_name })),
+      searchTerm
+    ).map(m => allRankedMembers.find(rm => rm.id === m.id)!)
+    : allRankedMembers;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -374,15 +389,15 @@ export default function VotingSession() {
                     />
                     <Label
                       htmlFor={`member-${member.id}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      className="flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
                       {member.full_name}
-                      {member.voteCount > 0 && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          ({member.voteCount} votos na pesquisa)
-                        </span>
-                      )}
                     </Label>
+                    {member.voteCount && member.voteCount > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {member.voteCount} {member.voteCount === 1 ? 'sugestão' : 'sugestões'}
+                      </Badge>
+                    )}
                   </div>
                 ))}
               </div>

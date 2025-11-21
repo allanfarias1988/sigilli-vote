@@ -23,6 +23,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Commission {
   id: string;
@@ -42,10 +49,13 @@ export default function Commissions() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [surveys, setSurveys] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     year: new Date().getFullYear(),
+    survey_id: null as string | null,
+    anonimato_modo: "anonimo" as "anonimo" | "obrigatorio" | "opcional",
   });
 
   // Carrega os dados iniciais
@@ -55,8 +65,22 @@ export default function Commissions() {
       const localTenantId = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
       setTenantId(localTenantId);
       loadData(localTenantId);
+      loadSurveys(localTenantId);
     }
   }, [user]);
+
+  const loadSurveys = async (tenantId: string) => {
+    try {
+      const { data, error } = await db
+        .from("surveys")
+        .eq("tenant_id", tenantId)
+        .select("id, title, status");
+      if (error) throw error;
+      setSurveys(data || []);
+    } catch (error) {
+      console.error("Error loading surveys:", error);
+    }
+  };
 
   const loadData = async (tenantId: string) => {
     if (!tenantId) return;
@@ -98,6 +122,8 @@ export default function Commissions() {
         name: formData.name,
         description: formData.description || null,
         year: formData.year,
+        survey_id: formData.survey_id,
+        anonimato_modo: formData.anonimato_modo,
         link_code: generateLinkCode(),
         status: "draft" as const,
       });
@@ -110,6 +136,8 @@ export default function Commissions() {
         name: "",
         description: "",
         year: new Date().getFullYear(),
+        survey_id: null,
+        anonimato_modo: "anonimo",
       });
       loadData(tenantId); // Recarrega os dados
     } catch (error) {
@@ -217,6 +245,45 @@ export default function Commissions() {
                     }
                     required
                   />
+                </div>
+                <div>
+                  <Label htmlFor="survey">Vincular Pesquisa de Sugestões (Opcional)</Label>
+                  <Select
+                    value={formData.survey_id || "none"}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, survey_id: value === "none" ? null : value })
+                    }
+                  >
+                    <SelectTrigger id="survey">
+                      <SelectValue placeholder="Selecione uma pesquisa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {surveys.map((survey) => (
+                        <SelectItem key={survey.id} value={survey.id}>
+                          {survey.title} ({survey.status})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="anonimato">Modo de Anonimato</Label>
+                  <Select
+                    value={formData.anonimato_modo}
+                    onValueChange={(value: any) =>
+                      setFormData({ ...formData, anonimato_modo: value })
+                    }
+                  >
+                    <SelectTrigger id="anonimato">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anonimo">Anônimo</SelectItem>
+                      <SelectItem value="opcional">Identificação Opcional</SelectItem>
+                      <SelectItem value="obrigatorio">Identificação Obrigatória</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button type="submit" className="w-full">
                   Criar Comissão
