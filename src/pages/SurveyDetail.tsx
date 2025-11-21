@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, Plus, Trash2, QrCode, Link as LinkIcon } from 'luci
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface SurveyItem {
   id: string;
@@ -221,9 +222,31 @@ export default function SurveyDetail() {
             <Button variant="outline" size="icon" onClick={copyLink}>
               <LinkIcon className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <QrCode className="h-4 w-4" />
-            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>QR Code da Pesquisa</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col items-center justify-center gap-4">
+                  <QRCodeSVG
+                    value={`${window.location.origin}/vote/survey/${survey.link_code}`}
+                    size={256}
+                    level="H"
+                  />
+                  <p className="text-sm text-muted-foreground text-center">
+                    Escaneie para acessar a pesquisa
+                  </p>
+                  <p className="text-xs text-muted-foreground text-center font-mono">
+                    {window.location.origin}/vote/survey/{survey.link_code}
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </header>
