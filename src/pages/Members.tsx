@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CSVImporter } from "@/components/CSVImporter";
 
 // Interface alinhada com o schema do localStorage/client.ts
 interface Member {
@@ -74,6 +75,7 @@ export default function Members() {
     setLoading(true);
     try {
       // CORREÇÃO: Ordem da query
+      // @ts-ignore
       const { data: membersData, error } = await db
         .from("members")
         .eq("tenant_id", tenantId)
@@ -124,6 +126,7 @@ export default function Members() {
 
       if (editingMember) {
         // CORREÇÃO: Ordem da query
+        // @ts-ignore
         const { error } = await db
           .from("members")
           .eq("id", editingMember.id)
@@ -132,7 +135,8 @@ export default function Members() {
         if (error) throw error;
         toast({ title: "Membro atualizado com sucesso!" });
       } else {
-        const { error } = await db.from("members").insert(memberData);
+        // @ts-ignore
+        const { error } = await db.from('members').insert(memberData);
 
         if (error) throw error;
         toast({ title: "Membro adicionado com sucesso!" });
@@ -172,7 +176,8 @@ export default function Members() {
 
     try {
       // CORREÇÃO: Ordem da query
-      const { error } = await db.from("members").eq("id", id).delete();
+      // @ts-ignore
+      const { error } = await db.from('members').eq('id', id).delete();
 
       if (error) throw error;
       toast({ title: "Membro excluído com sucesso!" });
@@ -211,6 +216,43 @@ export default function Members() {
     });
   };
 
+  const handleCSVImport = async (data: any[]) => {
+    if (!tenantId) return;
+
+    try {
+      const membersToImport = data.map(row => ({
+        tenant_id: tenantId,
+        full_name: row.nome_completo,
+        nickname: row.apelido || null,
+        email: row.email || null,
+        phone: row.telefone || null,
+        birth_date: row.data_nascimento || null,
+        baptism_year: row.ano_batismo ? parseInt(row.ano_batismo) : null,
+        is_active: row.is_active === 'false' ? false : true,
+        avatar_url: null,
+      }));
+
+      const { error } = await db.from('members').insert(membersToImport);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Importação concluída!',
+        description: `${membersToImport.length} membro(s) importado(s) com sucesso.`,
+      });
+
+      loadData(tenantId);
+    } catch (error) {
+      console.error('Error importing members:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível importar os membros.',
+        variant: 'destructive',
+      });
+      throw error; // Re-throw para que o componente CSVImporter saiba que falhou
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -233,144 +275,157 @@ export default function Members() {
             </Button>
             <h1 className="text-2xl font-bold">Membros</h1>
           </div>
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Membro
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingMember ? "Editar Membro" : "Novo Membro"}
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-                <div className="relative mx-auto w-24 h-24 mb-4">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage src={formData.avatar_url || ""} alt={formData.full_name} />
-                    <AvatarFallback>
-                      <UserCircle2 className="w-12 h-12 text-muted-foreground" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="absolute bottom-0 right-0 rounded-full h-8 w-8"
-                    onClick={handleFakeUpload}
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="full_name" className="text-right">
-                    Nome Completo
-                  </Label>
-                  <Input
-                    id="full_name"
-                    value={formData.full_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, full_name: e.target.value })
-                    }
-                    className="col-span-3"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="nickname" className="text-right">
-                    Apelido
-                  </Label>
-                  <Input
-                    id="nickname"
-                    value={formData.nickname}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nickname: e.target.value })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="phone" className="text-right">
-                    Telefone
-                  </Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="birth_date" className="text-right">
-                    Nascimento
-                  </Label>
-                  <Input
-                    id="birth_date"
-                    type="date"
-                    value={formData.birth_date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, birth_date: e.target.value })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="baptism_year" className="text-right">
-                    Ano Batismo
-                  </Label>
-                  <Input
-                    id="baptism_year"
-                    type="number"
-                    value={formData.baptism_year}
-                    onChange={(e) =>
-                      setFormData({ ...formData, baptism_year: e.target.value })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="is_active" className="text-right">
-                    Apto
-                  </Label>
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, is_active: checked })
-                    }
-                  />
-                </div>
-                <Button type="submit" className="w-full mt-4">
-                  {editingMember ? "Salvar Alterações" : "Cadastrar Membro"}
+          <div className="flex gap-2">
+            <CSVImporter
+              columns={[
+                { key: 'nome_completo', label: 'Nome Completo', required: true },
+                { key: 'apelido', label: 'Apelido' },
+                { key: 'email', label: 'Email' },
+                { key: 'telefone', label: 'Telefone' },
+                { key: 'data_nascimento', label: 'Data Nascimento' },
+                { key: 'ano_batismo', label: 'Ano Batismo' },
+                { key: 'is_active', label: 'Ativo' },
+              ]}
+              onImport={handleCSVImport}
+            />
+            <Dialog
+              open={isDialogOpen}
+              onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) resetForm();
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Membro
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingMember ? "Editar Membro" : "Novo Membro"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+                  <div className="relative mx-auto w-24 h-24 mb-4">
+                    <Avatar className="w-24 h-24">
+                      <AvatarImage src={formData.avatar_url || ""} alt={formData.full_name} />
+                      <AvatarFallback>
+                        <UserCircle2 className="w-12 h-12 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                      onClick={handleFakeUpload}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="full_name" className="text-right">
+                      Nome Completo
+                    </Label>
+                    <Input
+                      id="full_name"
+                      value={formData.full_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, full_name: e.target.value })
+                      }
+                      className="col-span-3"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="nickname" className="text-right">
+                      Apelido
+                    </Label>
+                    <Input
+                      id="nickname"
+                      value={formData.nickname}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nickname: e.target.value })
+                      }
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="email" className="text-right">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="phone" className="text-right">
+                      Telefone
+                    </Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="birth_date" className="text-right">
+                      Nascimento
+                    </Label>
+                    <Input
+                      id="birth_date"
+                      type="date"
+                      value={formData.birth_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, birth_date: e.target.value })
+                      }
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="baptism_year" className="text-right">
+                      Ano Batismo
+                    </Label>
+                    <Input
+                      id="baptism_year"
+                      type="number"
+                      value={formData.baptism_year}
+                      onChange={(e) =>
+                        setFormData({ ...formData, baptism_year: e.target.value })
+                      }
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="is_active" className="text-right">
+                      Apto
+                    </Label>
+                    <Switch
+                      id="is_active"
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, is_active: checked })
+                      }
+                    />
+                  </div>
+                  <Button type="submit" className="w-full mt-4">
+                    {editingMember ? "Salvar Alterações" : "Cadastrar Membro"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
@@ -396,43 +451,179 @@ export default function Members() {
                     <UserCircle2 className="h-6 w-6 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
-              </div>
-              <div className="ml-4 flex-grow">
-                <p className="font-semibold">{member.full_name}</p>
-                {member.nickname && (
-                  <p className="text-sm text-muted-foreground">
-                    {member.nickname}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-1">
                 <Button
-                  variant="ghost"
+                  type="button"
+                  variant="outline"
                   size="icon"
-                  onClick={() => handleEdit(member)}
+                  className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                  onClick={handleFakeUpload}
                 >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(member.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Camera className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {members.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              Nenhum membro cadastrado ainda.
-            </p>
-          </div>
-        )}
-      </main>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="full_name" className="text-right">
+                  Nome Completo
+                </Label>
+                <Input
+                  id="full_name"
+                  value={formData.full_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, full_name: e.target.value })
+                  }
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="nickname" className="text-right">
+                  Apelido
+                </Label>
+                <Input
+                  id="nickname"
+                  value={formData.nickname}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nickname: e.target.value })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right">
+                  Telefone
+                </Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="birth_date" className="text-right">
+                  Nascimento
+                </Label>
+                <Input
+                  id="birth_date"
+                  type="date"
+                  value={formData.birth_date}
+                  onChange={(e) =>
+                    setFormData({ ...formData, birth_date: e.target.value })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="baptism_year" className="text-right">
+                  Ano Batismo
+                </Label>
+                <Input
+                  id="baptism_year"
+                  type="number"
+                  value={formData.baptism_year}
+                  onChange={(e) =>
+                    setFormData({ ...formData, baptism_year: e.target.value })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="is_active" className="text-right">
+                  Apto
+                </Label>
+                <Switch
+                  id="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, is_active: checked })
+                  }
+                />
+              </div>
+              <Button type="submit" className="w-full mt-4">
+                {editingMember ? "Salvar Alterações" : "Cadastrar Membro"}
+              </Button>
+            </form>
+            </DialogContent>
+      </Dialog>
     </div>
+      </header >
+
+    <main className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <Input
+          type="text"
+          placeholder="Buscar membros por nome ou apelido..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        {filteredMembers.map((member) => (
+          <div
+            key={member.id}
+            className="flex items-center p-3 bg-card rounded-lg border"
+          >
+            <div>
+              <Avatar>
+                <AvatarImage src={member.avatar_url || ""} alt={member.full_name} />
+                <AvatarFallback>
+                  <UserCircle2 className="h-6 w-6 text-muted-foreground" />
+                </AvatarFallback>
+              </Avatar>
+            </div>
+            <div className="ml-4 flex-grow">
+              <p className="font-semibold">{member.full_name}</p>
+              {member.nickname && (
+                <p className="text-sm text-muted-foreground">
+                  {member.nickname}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleEdit(member)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDelete(member.id)}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {members.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">
+            Nenhum membro cadastrado ainda.
+          </p>
+        </div>
+      )}
+    </main>
+    </div >
   );
 }
