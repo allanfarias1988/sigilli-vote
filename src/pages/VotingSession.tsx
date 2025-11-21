@@ -23,6 +23,7 @@ import { searchMembers } from "@/lib/search-utils";
 interface Commission {
   id: string;
   name: string;
+  nome?: string;
   description: string | null;
   year: number;
   link_code: string;
@@ -34,15 +35,18 @@ interface Commission {
 interface CommissionRole {
   id: string;
   commission_id: string;
-  role_name: string;
-  max_selections: number;
-  order: number;
-  is_active: boolean;
+  nome_cargo: string; // Alterado para PT-BR
+  max_selecoes: number; // Alterado para PT-BR
+  ordem: number; // Alterado para PT-BR
+  ativo: boolean; // Alterado para PT-BR
+  role_name?: string; // Compatibilidade
+  max_selections?: number; // Compatibilidade
 }
 
 interface Member {
   id: string;
   full_name: string;
+  nome_completo?: string;
   nickname?: string;
   voteCount?: number;
 }
@@ -90,6 +94,7 @@ export default function VotingSession() {
 
   const loadSurveyData = async (surveyId: string) => {
     try {
+      // @ts-ignore
       const { data: itemsData, error: itemsError } = await db
         .from("survey_items")
         .select("*")
@@ -97,6 +102,7 @@ export default function VotingSession() {
       if (itemsError) throw itemsError;
       setSurveyItems(itemsData || []);
 
+      // @ts-ignore
       const { data: votesData, error: votesError } = await db
         .from("survey_votes")
         .select("*")
@@ -116,9 +122,13 @@ export default function VotingSession() {
   const loadCommissionDetails = async (id: string) => {
     setLoading(true);
     try {
+      // @ts-ignore
       const { data, error } = await db.from("commissions").select('*').eq("id", id).single();
       if (error) throw error;
-      setCommission(data);
+      setCommission({
+        ...data,
+        name: data.nome || data.name // Normalizar nome
+      });
     } catch (error) {
       console.error("Error loading commission details:", error);
       toast({
@@ -133,13 +143,24 @@ export default function VotingSession() {
 
   const loadRoles = async (id: string) => {
     try {
+      // @ts-ignore
       const { data, error } = await db
         .from("commission_roles")
         .eq("commission_id", id)
         .select("*");
 
       if (error) throw error;
-      const sortedRoles = (data || []).sort((a, b) => a.order - b.order);
+
+      // Normalizar dados
+      const normalizedRoles = (data || []).map((r: any) => ({
+        ...r,
+        nome_cargo: r.nome_cargo || r.role_name,
+        max_selecoes: r.max_selecoes || r.max_selections,
+        ordem: r.ordem || r.order,
+        ativo: r.ativo !== undefined ? r.ativo : r.is_active
+      }));
+
+      const sortedRoles = normalizedRoles.sort((a: any, b: any) => a.ordem - b.ordem);
       setRoles(sortedRoles);
     } catch (error) {
       console.error("Error loading roles:", error);
@@ -153,9 +174,16 @@ export default function VotingSession() {
 
   const loadMembers = async () => {
     try {
-      const { data, error } = await db.from("members").select("id, full_name");
+      // @ts-ignore
+      const { data, error } = await db.from("members").select("id, full_name, nome_completo");
       if (error) throw error;
-      setMembers(data || []);
+
+      const normalizedMembers = (data || []).map((m: any) => ({
+        ...m,
+        full_name: m.nome_completo || m.full_name
+      }));
+
+      setMembers(normalizedMembers);
     } catch (error) {
       console.error("Error loading members:", error);
       toast({
@@ -174,12 +202,12 @@ export default function VotingSession() {
       if (prevSelected.includes(memberId)) {
         return prevSelected.filter((id) => id !== memberId);
       } else {
-        if (prevSelected.length < currentRole.max_selections) {
+        if (prevSelected.length < currentRole.max_selecoes) {
           return [...prevSelected, memberId];
         } else {
           toast({
             title: "Limite de seleção atingido",
-            description: `Você só pode selecionar até ${currentRole.max_selections} membro(s) para este cargo.`,
+            description: `Você só pode selecionar até ${currentRole.max_selecoes} membro(s) para este cargo.`,
             variant: "destructive",
           });
           return prevSelected;
@@ -194,6 +222,7 @@ export default function VotingSession() {
 
     try {
       // 1. Create a ballot
+      // @ts-ignore
       const { data: ballotData, error: ballotError } = await db
         .from("ballots")
         .insert({
@@ -214,6 +243,7 @@ export default function VotingSession() {
       }));
 
       if (votesToInsert.length > 0) {
+        // @ts-ignore
         const { error: votesError } = await db
           .from("votes")
           .insert(votesToInsert);
@@ -222,7 +252,7 @@ export default function VotingSession() {
 
       toast({
         title: "Votos salvos com sucesso!",
-        description: `Votos para ${currentRole.role_name} foram registrados.`,
+        description: `Votos para ${currentRole.nome_cargo} foram registrados.`,
       });
 
       // 3. Move to the next role
@@ -250,7 +280,7 @@ export default function VotingSession() {
     allSurveyVotes: any[],
   ) => {
     const correspondingSurveyItem = allSurveyItems.find(
-      (item) => item.role_name === role.role_name,
+      (item) => item.cargo_nome === role.nome_cargo || item.role_name === role.nome_cargo,
     );
 
     if (!correspondingSurveyItem) {
@@ -258,11 +288,18 @@ export default function VotingSession() {
     }
 
     const votesForThisRole = allSurveyVotes.filter(
-      (vote) => vote.role_name === correspondingSurveyItem.role_name,
+      (vote) => vote.cargo_nome === correspondingSurveyItem.cargo_nome || vote.role_name === correspondingSurveyItem.cargo_nome,
     );
 
     const memberVoteCounts: { [memberId: string]: number } = {};
     for (const vote of votesForThisRole) {
+      // Se o voto tiver sugestões (array) ou for um voto único (member_id)
+      // O mock data usa member_id e vote_count, mas o código original assumia 'suggestions' array?
+      // Vamos ajustar para o mock data atual que tem member_id e vote_count
+      if (vote.member_id) {
+        memberVoteCounts[vote.member_id] = (memberVoteCounts[vote.member_id] || 0) + (vote.vote_count || 1);
+      }
+      // Fallback para estrutura antiga se existir
       if (vote.suggestions && Array.isArray(vote.suggestions)) {
         for (const suggestedMemberId of vote.suggestions) {
           memberVoteCounts[suggestedMemberId] = (memberVoteCounts[suggestedMemberId] || 0) + 1;
@@ -277,7 +314,7 @@ export default function VotingSession() {
       }))
       .sort((a, b) => {
         if (b.voteCount !== a.voteCount) {
-          return b.voteCount - a.voteCount;
+          return (b.voteCount || 0) - (a.voteCount || 0);
         }
         return a.full_name.localeCompare(b.full_name);
       });
@@ -304,7 +341,7 @@ export default function VotingSession() {
     );
   }
 
-  if (commission?.status === "closed") {
+  if (commission?.status === "closed" || commission?.status === "finalizada") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
         <p className="text-2xl font-bold mb-4">
@@ -360,9 +397,9 @@ export default function VotingSession() {
         {currentRole ? (
           <Card>
             <CardHeader>
-              <CardTitle>{currentRole.role_name}</CardTitle>
+              <CardTitle>{currentRole.nome_cargo}</CardTitle>
               <CardDescription>
-                Selecione até {currentRole.max_selections} nome(s) para este
+                Selecione até {currentRole.max_selecoes} nome(s) para este
                 cargo.
               </CardDescription>
             </CardHeader>

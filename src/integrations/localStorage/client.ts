@@ -205,8 +205,8 @@ const getInitialMockData = (): LocalDatabase => {
         year: 2024,
         description:
           "Comissão para nomear os oficiais da igreja para o próximo ano.",
-        survey_id: null, // Adicionado o campo survey_id
-        identification_mode: "anonymous", // Adicionado o campo identification_mode
+        survey_id: null,
+        anonimato_modo: "anonimo",
         status: "draft",
         link_code: "xyz123",
         created_by: "user-001",
@@ -218,18 +218,20 @@ const getInitialMockData = (): LocalDatabase => {
       {
         id: "role-001",
         commission_id: defaultCommissionId,
-        role_name: "Primeiro Ancião",
-        max_selections: 1,
-        order: 1,
-        is_active: true,
+        nome_cargo: "Primeiro Ancião",
+        max_selecoes: 1,
+        ordem: 1,
+        ativo: true,
+        created_at: new Date().toISOString(),
       },
       {
         id: "role-002",
         commission_id: defaultCommissionId,
-        role_name: "Tesoureiro",
-        max_selections: 1,
-        order: 2,
-        is_active: true,
+        nome_cargo: "Tesoureiro",
+        max_selecoes: 1,
+        ordem: 2,
+        ativo: true,
+        created_at: new Date().toISOString(),
       },
     ],
     ballots: [],
@@ -239,30 +241,50 @@ const getInitialMockData = (): LocalDatabase => {
       {
         id: defaultSurveyId,
         tenant_id: defaultTenantId,
-        title: "Sugestões para Líderes 2025",
-        description: "Sugira nomes para os cargos da igreja no próximo ano.",
-        status: "open", // 'open', 'closed'
+        titulo: "Sugestões para Líderes 2025",
+        descricao: "Sugira nomes para os cargos da igreja no próximo ano.",
+        status: "aberta", // 'aberta', 'fechada'
         link_code: "surv123",
         created_at: new Date().toISOString(),
+        ano: 2025,
+        updated_at: new Date().toISOString(),
       },
     ],
     survey_items: [
       {
         id: "item-001",
         survey_id: defaultSurveyId,
-        role_name: "Presidente",
-        max_suggestions: 2,
+        cargo_nome: "Presidente",
+        max_sugestoes: 2,
+        ordem: 1,
+        created_at: new Date().toISOString(),
       },
       {
         id: "item-002",
         survey_id: defaultSurveyId,
-        role_name: "Tesoureiro",
-        max_suggestions: 1,
+        cargo_nome: "Tesoureiro",
+        max_sugestoes: 1,
+        ordem: 2,
+        created_at: new Date().toISOString(),
       },
     ],
     survey_votes: [
-      // Exemplo de um voto (apenas para ter dados mockados, se necessário)
-      // { id: 'svote-001', survey_id: defaultSurveyId, member_id: 'mem-001', role_name: 'Presidente', suggestions: ['mem-002'] }
+      {
+        id: "svote-001",
+        survey_id: defaultSurveyId,
+        member_id: "mem-001",
+        cargo_nome: "Presidente",
+        created_at: new Date().toISOString(),
+        vote_count: 1,
+      },
+      {
+        id: "svote-002",
+        survey_id: defaultSurveyId,
+        member_id: "mem-002",
+        cargo_nome: "Presidente",
+        created_at: new Date().toISOString(),
+        vote_count: 1,
+      },
     ],
   };
 };
@@ -270,7 +292,7 @@ const getInitialMockData = (): LocalDatabase => {
 class LocalDBManager {
   private static instance: LocalDatabase;
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): LocalDatabase {
     if (!LocalDBManager.instance) {
@@ -470,4 +492,27 @@ const from = <T extends TableName>(tableName: T) => {
 
 export const db = {
   from,
+  channel: (name: string) => ({
+    on: (event: string, config: any, callback: (payload: any) => void) => ({
+      subscribe: () => {
+        console.log(`[Mock Realtime] Subscribed to channel: ${name}`);
+        return {
+          unsubscribe: () => console.log(`[Mock Realtime] Unsubscribed from channel: ${name}`),
+        };
+      },
+    }),
+    subscribe: (callback?: (status: string) => void) => {
+      console.log(`[Mock Realtime] Subscribed to channel: ${name}`);
+      if (callback) callback("SUBSCRIBED");
+      return {
+        unsubscribe: () => console.log(`[Mock Realtime] Unsubscribed from channel: ${name}`),
+      };
+    },
+  }),
+  removeChannel: (channel: any) => {
+    console.log("[Mock Realtime] Channel removed");
+    if (channel && typeof channel.unsubscribe === "function") {
+      channel.unsubscribe();
+    }
+  },
 };
