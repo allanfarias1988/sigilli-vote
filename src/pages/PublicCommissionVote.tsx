@@ -82,13 +82,13 @@ export default function PublicCommissionVote() {
         return;
       }
 
-      if (commissionData.status === "closed") {
+      if (commissionData.status === "finalizada") {
         toast({
           title: "Votação encerrada",
           description: "Esta comissão não está mais aceitando votos.",
           variant: "destructive",
         });
-        setCommission(commissionData as Commission); // Ainda define a comissão para exibir o nome
+        setCommission(commissionData as Commission);
         setLoading(false);
         return;
       }
