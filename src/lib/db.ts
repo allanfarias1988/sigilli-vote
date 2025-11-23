@@ -24,10 +24,15 @@ const isLocal = import.meta.env.VITE_DATA_SOURCE === "local";
 
 console.log(`[DB Provider] Usando: ${isLocal ? "LocalStorage" : "Supabase"}`);
 
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "@/integrations/supabase/types";
+
 // A variável 'db' será o nosso cliente padrão para toda a aplicação.
 // Se estivermos em modo local, ela usa a implementação do localStorage.
 // Se não, ela usa o cliente Supabase.
-export const db = isLocal ? localStorageDB : supabase;
+export const db = isLocal
+    ? (localStorageDB as unknown as SupabaseClient<Database>)
+    : supabase;
 
 // Também exportamos o cliente Supabase original com seu nome 'supabase'.
 // Isso é importante porque a lógica de autenticação (useAuth.tsx) provavelmente depende

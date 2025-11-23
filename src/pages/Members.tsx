@@ -27,17 +27,26 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CSVImporter } from "@/components/CSVImporter";
 
 // Interface alinhada com o schema do localStorage/client.ts
+// Interface alinhada com o schema do localStorage/client.ts
 interface Member {
   id: string;
-  full_name: string;
-  nickname?: string | null;
+  nome_completo: string;
+  apelido?: string | null;
   email?: string | null;
-  phone?: string | null;
-  birth_date?: string | null;
-  baptism_year?: number | null;
-  is_active: boolean;
+  telefone?: string | null;
+  data_nasc?: string | null;
+  ano_batismo?: number | null;
+  apto: boolean;
   tenant_id: string;
-  avatar_url?: string | null;
+  imagem_url?: string | null;
+  // Campos adicionais do banco
+  cargos_atuais?: string[] | null;
+  endereco?: string | null;
+  estado_civil?: string | null;
+  interesses?: string[] | null;
+  tempo_no_cargo?: number | null;
+  updated_at?: string;
+  created_at?: string;
 }
 
 export default function Members() {
@@ -52,14 +61,14 @@ export default function Members() {
 
   // Estado do formulário alinhado com a interface Member
   const [formData, setFormData] = useState({
-    full_name: "",
-    nickname: "",
+    nome_completo: "",
+    apelido: "",
     email: "",
-    phone: "",
-    birth_date: "",
-    baptism_year: "",
-    is_active: true,
-    avatar_url: "",
+    telefone: "",
+    data_nasc: "",
+    ano_batismo: "",
+    apto: true,
+    imagem_url: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,16 +83,14 @@ export default function Members() {
   const loadData = async (tenantId: string) => {
     setLoading(true);
     try {
-      // CORREÇÃO: Ordem da query
-      // @ts-ignore
       const { data: membersData, error } = await db
         .from("members")
-        .eq("tenant_id", tenantId)
-        .select("*");
+        .select("*")
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
       const sortedMembers = (membersData || []).sort((a, b) =>
-        a.full_name.localeCompare(b.full_name)
+        (a.nome_completo || "").localeCompare(b.nome_completo || "")
       );
       setMembers(sortedMembers);
     } catch (error) {
@@ -100,9 +107,9 @@ export default function Members() {
 
   const filteredMembers = members.filter(
     (member) =>
-      member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (member.nickname &&
-        member.nickname.toLowerCase().includes(searchTerm.toLowerCase())),
+      member.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (member.apelido &&
+        member.apelido.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,30 +119,27 @@ export default function Members() {
     try {
       const memberData = {
         tenant_id: tenantId,
-        full_name: formData.full_name,
-        nickname: formData.nickname || null,
+        nome_completo: formData.nome_completo,
+        apelido: formData.apelido || null,
         email: formData.email || null,
-        phone: formData.phone || null,
-        birth_date: formData.birth_date || null,
-        baptism_year: formData.baptism_year
-          ? parseInt(formData.baptism_year)
+        telefone: formData.telefone || null,
+        data_nasc: formData.data_nasc || null,
+        ano_batismo: formData.ano_batismo
+          ? parseInt(formData.ano_batismo)
           : null,
-        is_active: formData.is_active,
-        avatar_url: formData.avatar_url || null,
+        apto: formData.apto,
+        imagem_url: formData.imagem_url || null,
       };
 
       if (editingMember) {
-        // CORREÇÃO: Ordem da query
-        // @ts-ignore
         const { error } = await db
           .from("members")
-          .eq("id", editingMember.id)
-          .update(memberData);
+          .update(memberData)
+          .eq("id", editingMember.id);
 
         if (error) throw error;
         toast({ title: "Membro atualizado com sucesso!" });
       } else {
-        // @ts-ignore
         const { error } = await db.from('members').insert(memberData);
 
         if (error) throw error;
@@ -158,14 +162,14 @@ export default function Members() {
   const handleEdit = (member: Member) => {
     setEditingMember(member);
     setFormData({
-      full_name: member.full_name,
-      nickname: member.nickname || "",
+      nome_completo: member.nome_completo,
+      apelido: member.apelido || "",
       email: member.email || "",
-      phone: member.phone || "",
-      birth_date: member.birth_date || "",
-      baptism_year: member.baptism_year?.toString() || "",
-      is_active: member.is_active,
-      avatar_url: member.avatar_url || "",
+      telefone: member.telefone || "",
+      data_nasc: member.data_nasc || "",
+      ano_batismo: member.ano_batismo?.toString() || "",
+      apto: member.apto,
+      imagem_url: member.imagem_url || "",
     });
     setIsDialogOpen(true);
   };
@@ -175,9 +179,7 @@ export default function Members() {
     if (!tenantId) return;
 
     try {
-      // CORREÇÃO: Ordem da query
-      // @ts-ignore
-      const { error } = await db.from('members').eq('id', id).delete();
+      const { error } = await db.from('members').delete().eq('id', id);
 
       if (error) throw error;
       toast({ title: "Membro excluído com sucesso!" });
@@ -194,14 +196,14 @@ export default function Members() {
 
   const resetForm = () => {
     setFormData({
-      full_name: "",
-      nickname: "",
+      nome_completo: "",
+      apelido: "",
       email: "",
-      phone: "",
-      birth_date: "",
-      baptism_year: "",
-      is_active: true,
-      avatar_url: "",
+      telefone: "",
+      data_nasc: "",
+      ano_batismo: "",
+      apto: true,
+      imagem_url: "",
     });
     setEditingMember(null);
   };
@@ -212,7 +214,7 @@ export default function Members() {
     const randomId = Math.floor(Math.random() * 1000);
     setFormData({
       ...formData,
-      avatar_url: `https://i.pravatar.cc/150?u=mem-${randomId}`,
+      imagem_url: `https://i.pravatar.cc/150?u=mem-${randomId}`,
     });
   };
 
@@ -222,14 +224,14 @@ export default function Members() {
     try {
       const membersToImport = data.map(row => ({
         tenant_id: tenantId,
-        full_name: row.nome_completo,
-        nickname: row.apelido || null,
+        nome_completo: row.nome_completo || "",
+        apelido: row.apelido || null,
         email: row.email || null,
-        phone: row.telefone || null,
-        birth_date: row.data_nascimento || null,
-        baptism_year: row.ano_batismo ? parseInt(row.ano_batismo) : null,
-        is_active: row.is_active === 'false' ? false : true,
-        avatar_url: null,
+        telefone: row.telefone || null,
+        data_nasc: row.data_nasc || null,
+        ano_batismo: row.ano_batismo ? parseInt(row.ano_batismo) : null,
+        apto: String(row.apto).toLowerCase() === 'sim' || String(row.apto).toLowerCase() === 'true',
+        imagem_url: null,
       }));
 
       const { error } = await db.from('members').insert(membersToImport);
@@ -278,13 +280,13 @@ export default function Members() {
           <div className="flex gap-2">
             <CSVImporter
               columns={[
-                { key: 'nome_completo', label: 'Nome Completo', required: true },
-                { key: 'apelido', label: 'Apelido' },
+                { key: 'nome_completo', label: 'Nome Completo', required: true, aliases: ['nome', 'name', 'full_name'] },
+                { key: 'apelido', label: 'Apelido', aliases: ['nickname'] },
                 { key: 'email', label: 'Email' },
-                { key: 'telefone', label: 'Telefone' },
-                { key: 'data_nascimento', label: 'Data Nascimento' },
-                { key: 'ano_batismo', label: 'Ano Batismo' },
-                { key: 'is_active', label: 'Ativo' },
+                { key: 'telefone', label: 'Telefone', aliases: ['phone'] },
+                { key: 'data_nasc', label: 'Data Nascimento', aliases: ['data_nascimento', 'birth_date'] },
+                { key: 'ano_batismo', label: 'Ano Batismo', aliases: ['baptism_year'] },
+                { key: 'apto', label: 'Apto', aliases: ['is_active', 'active'] },
               ]}
               onImport={handleCSVImport}
             />
@@ -310,7 +312,7 @@ export default function Members() {
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
                   <div className="relative mx-auto w-24 h-24 mb-4">
                     <Avatar className="w-24 h-24">
-                      <AvatarImage src={formData.avatar_url || ""} alt={formData.full_name} />
+                      <AvatarImage src={formData.imagem_url || ""} alt={formData.nome_completo} />
                       <AvatarFallback>
                         <UserCircle2 className="w-12 h-12 text-muted-foreground" />
                       </AvatarFallback>
@@ -326,28 +328,28 @@ export default function Members() {
                     </Button>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="full_name" className="text-right">
+                    <Label htmlFor="nome_completo" className="text-right">
                       Nome Completo
                     </Label>
                     <Input
-                      id="full_name"
-                      value={formData.full_name}
+                      id="nome_completo"
+                      value={formData.nome_completo}
                       onChange={(e) =>
-                        setFormData({ ...formData, full_name: e.target.value })
+                        setFormData({ ...formData, nome_completo: e.target.value })
                       }
                       className="col-span-3"
                       required
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="nickname" className="text-right">
+                    <Label htmlFor="apelido" className="text-right">
                       Apelido
                     </Label>
                     <Input
-                      id="nickname"
-                      value={formData.nickname}
+                      id="apelido"
+                      value={formData.apelido}
                       onChange={(e) =>
-                        setFormData({ ...formData, nickname: e.target.value })
+                        setFormData({ ...formData, apelido: e.target.value })
                       }
                       className="col-span-3"
                     />
@@ -367,55 +369,55 @@ export default function Members() {
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="phone" className="text-right">
+                    <Label htmlFor="telefone" className="text-right">
                       Telefone
                     </Label>
                     <Input
-                      id="phone"
-                      value={formData.phone}
+                      id="telefone"
+                      value={formData.telefone}
                       onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
+                        setFormData({ ...formData, telefone: e.target.value })
                       }
                       className="col-span-3"
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="birth_date" className="text-right">
+                    <Label htmlFor="data_nasc" className="text-right">
                       Nascimento
                     </Label>
                     <Input
-                      id="birth_date"
+                      id="data_nasc"
                       type="date"
-                      value={formData.birth_date}
+                      value={formData.data_nasc}
                       onChange={(e) =>
-                        setFormData({ ...formData, birth_date: e.target.value })
+                        setFormData({ ...formData, data_nasc: e.target.value })
                       }
                       className="col-span-3"
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="baptism_year" className="text-right">
+                    <Label htmlFor="ano_batismo" className="text-right">
                       Ano Batismo
                     </Label>
                     <Input
-                      id="baptism_year"
+                      id="ano_batismo"
                       type="number"
-                      value={formData.baptism_year}
+                      value={formData.ano_batismo}
                       onChange={(e) =>
-                        setFormData({ ...formData, baptism_year: e.target.value })
+                        setFormData({ ...formData, ano_batismo: e.target.value })
                       }
                       className="col-span-3"
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="is_active" className="text-right">
+                    <Label htmlFor="apto" className="text-right">
                       Apto
                     </Label>
                     <Switch
-                      id="is_active"
-                      checked={formData.is_active}
+                      id="apto"
+                      checked={formData.apto}
                       onCheckedChange={(checked) =>
-                        setFormData({ ...formData, is_active: checked })
+                        setFormData({ ...formData, apto: checked })
                       }
                     />
                   </div>
@@ -426,6 +428,7 @@ export default function Members() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
@@ -446,184 +449,48 @@ export default function Members() {
             >
               <div>
                 <Avatar>
-                  <AvatarImage src={member.avatar_url || ""} alt={member.full_name} />
+                  <AvatarImage src={member.imagem_url || ""} alt={member.nome_completo} />
                   <AvatarFallback>
                     <UserCircle2 className="h-6 w-6 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
+              </div>
+              <div className="ml-4 flex-grow">
+                <p className="font-semibold">{member.nome_completo}</p>
+                {member.apelido && (
+                  <p className="text-sm text-muted-foreground">
+                    {member.apelido}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-1">
                 <Button
-                  type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="absolute bottom-0 right-0 rounded-full h-8 w-8"
-                  onClick={handleFakeUpload}
+                  onClick={() => handleEdit(member)}
                 >
-                  <Camera className="h-4 w-4" />
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(member.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="full_name" className="text-right">
-                  Nome Completo
-                </Label>
-                <Input
-                  id="full_name"
-                  value={formData.full_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, full_name: e.target.value })
-                  }
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="nickname" className="text-right">
-                  Apelido
-                </Label>
-                <Input
-                  id="nickname"
-                  value={formData.nickname}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nickname: e.target.value })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">
-                  Telefone
-                </Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="birth_date" className="text-right">
-                  Nascimento
-                </Label>
-                <Input
-                  id="birth_date"
-                  type="date"
-                  value={formData.birth_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, birth_date: e.target.value })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="baptism_year" className="text-right">
-                  Ano Batismo
-                </Label>
-                <Input
-                  id="baptism_year"
-                  type="number"
-                  value={formData.baptism_year}
-                  onChange={(e) =>
-                    setFormData({ ...formData, baptism_year: e.target.value })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="is_active" className="text-right">
-                  Apto
-                </Label>
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, is_active: checked })
-                  }
-                />
-              </div>
-              <Button type="submit" className="w-full mt-4">
-                {editingMember ? "Salvar Alterações" : "Cadastrar Membro"}
-              </Button>
-            </form>
-            </DialogContent>
-      </Dialog>
-    </div>
-      </header >
-
-    <main className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <Input
-          type="text"
-          placeholder="Buscar membros por nome ou apelido..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
-      <div className="space-y-2">
-        {filteredMembers.map((member) => (
-          <div
-            key={member.id}
-            className="flex items-center p-3 bg-card rounded-lg border"
-          >
-            <div>
-              <Avatar>
-                <AvatarImage src={member.avatar_url || ""} alt={member.full_name} />
-                <AvatarFallback>
-                  <UserCircle2 className="h-6 w-6 text-muted-foreground" />
-                </AvatarFallback>
-              </Avatar>
             </div>
-            <div className="ml-4 flex-grow">
-              <p className="font-semibold">{member.full_name}</p>
-              {member.nickname && (
-                <p className="text-sm text-muted-foreground">
-                  {member.nickname}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleEdit(member)}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDelete(member.id)}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {members.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            Nenhum membro cadastrado ainda.
-          </p>
+          ))}
         </div>
-      )}
-    </main>
+
+        {members.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              Nenhum membro cadastrado ainda.
+            </p>
+          </div>
+        )}
+      </main>
     </div >
   );
 }

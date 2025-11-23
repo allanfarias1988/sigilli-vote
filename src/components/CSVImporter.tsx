@@ -11,6 +11,7 @@ interface ColumnDef {
     key: string;
     label: string;
     required?: boolean;
+    aliases?: string[];
 }
 
 interface CSVImporterProps {
@@ -32,8 +33,32 @@ export function CSVImporter({ columns, onImport }: CSVImporterProps) {
             header: true,
             skipEmptyLines: true,
             complete: (results) => {
-                // Validate required columns
-                const missing = columns.filter(col => col.required && !(col.key in results.data[0] || !(results.meta.fields?.includes(col.key)));
+                const rawData = results.data as any[];
+
+                // Normalize data based on aliases
+                const normalizedData = rawData.map(row => {
+                    const newRow = { ...row };
+                    columns.forEach(col => {
+                        // If key is missing but alias exists, map it
+                        if (!(col.key in row) && col.aliases) {
+                            for (const alias of col.aliases) {
+                                if (alias in row) {
+                                    newRow[col.key] = row[alias];
+                                    break; // Use the first found alias
+                                }
+                            }
+                        }
+                    });
+                    return newRow;
+                });
+
+                // Validate required columns on normalized data
+                const missing = columns.filter(col => {
+                    if (!col.required) return false;
+                    const firstRow = normalizedData[0] || {};
+                    return !(col.key in firstRow);
+                });
+
                 if (missing.length) {
                     toast({
                         title: "Erro de validação",
@@ -43,7 +68,7 @@ export function CSVImporter({ columns, onImport }: CSVImporterProps) {
                     setPreviewData([]);
                     return;
                 }
-                setPreviewData(results.data as any[]);
+                setPreviewData(normalizedData);
             },
             error: (err) => {
                 toast({ title: "Erro ao ler CSV", description: err.message, variant: "destructive" });
@@ -67,7 +92,7 @@ export function CSVImporter({ columns, onImport }: CSVImporterProps) {
             <DialogTrigger asChild>
                 <Button variant="outline">Importar CSV</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[900px]">
                 <DialogHeader>
                     <DialogTitle>Importar Membros via CSV</DialogTitle>
                 </DialogHeader>
