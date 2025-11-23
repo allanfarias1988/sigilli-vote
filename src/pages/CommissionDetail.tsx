@@ -51,15 +51,13 @@ import { FinalizationDialog } from "@/components/FinalizationDialog";
 // Tipos baseados no nosso localStorage/client.ts e supabase/types.ts
 interface Commission {
   id: string;
-  name: string;
-  nome: string; // Adicionado para compatibilidade com FinalizationDialog
-  description: string | null;
-  year: number;
+  nome: string;
+  descricao: string | null;
+  ano: number;
   link_code: string;
   status: string;
   finalized_at: string | null;
   survey_id: string | null;
-  identification_mode: string | null;
   anonimato_modo: string | null;
 }
 
@@ -165,12 +163,7 @@ export default function CommissionDetail() {
         .single();
 
       if (commissionError) throw commissionError;
-      const commissionWithNome = {
-        ...commissionData,
-        nome: commissionData.nome || "",
-        identification_mode: commissionData.anonimato_modo || commissionData.identification_mode
-      };
-      setCommission(commissionWithNome);
+      setCommission(commissionData);
       setSelectedSurveyId(commissionData.survey_id);
       setSelectedIdentificationMode(commissionData.anonimato_modo || "anonymous");
 
