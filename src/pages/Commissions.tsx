@@ -33,9 +33,9 @@ import {
 
 interface Commission {
   id: string;
-  name: string; // Corrigido de 'nome' para 'name' para consistência
-  description?: string | null; // Corrigido de 'descricao'
-  year: number; // Corrigido de 'ano'
+  nome: string;
+  descricao?: string | null;
+  ano: number;
   status: string;
   link_code: string;
   created_at: string;
@@ -51,9 +51,9 @@ export default function Commissions() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [surveys, setSurveys] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    year: new Date().getFullYear(),
+    nome: "",
+    descricao: "",
+    ano: new Date().getFullYear(),
     survey_id: null as string | null,
     anonimato_modo: "anonimo" as "anonimo" | "obrigatorio" | "opcional",
   });
@@ -73,8 +73,8 @@ export default function Commissions() {
     try {
       const { data, error } = await db
         .from("surveys")
-        .eq("tenant_id", tenantId)
-        .select("id, title, status");
+        .select("id, titulo, status")
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       setSurveys(data || []);
     } catch (error) {
@@ -86,12 +86,10 @@ export default function Commissions() {
     if (!tenantId) return;
     setLoading(true);
     try {
-      // CORREÇÃO: Ordem da query
       const { data: commissionsData, error } = await db
         .from("commissions")
-        .eq("tenant_id", tenantId) // .eq() antes de .select()
-        .select("*");
-      // .order('created_at', { ascending: false }); // .order() será implementado depois
+        .select("*")
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
       setCommissions(commissionsData || []);
@@ -119,9 +117,9 @@ export default function Commissions() {
       const { error } = await db.from("commissions").insert({
         tenant_id: tenantId,
         created_by: user.id,
-        name: formData.name,
-        description: formData.description || null,
-        year: formData.year,
+        nome: formData.nome,
+        descricao: formData.descricao || null,
+        ano: formData.ano,
         survey_id: formData.survey_id,
         anonimato_modo: formData.anonimato_modo,
         link_code: generateLinkCode(),
@@ -133,13 +131,13 @@ export default function Commissions() {
       toast({ title: "Comissão criada com sucesso!" });
       setIsDialogOpen(false);
       setFormData({
-        name: "",
-        description: "",
-        year: new Date().getFullYear(),
+        nome: "",
+        descricao: "",
+        ano: new Date().getFullYear(),
         survey_id: null,
         anonimato_modo: "anonimo",
       });
-      loadData(tenantId); // Recarrega os dados
+      loadData(tenantId);
     } catch (error) {
       console.error("Error creating commission:", error);
       toast({
@@ -152,14 +150,13 @@ export default function Commissions() {
 
   const updateStatus = async (
     commission: Commission,
-    newStatus: "draft" | "open" | "closed",
+    newStatus: "draft" | "aberta" | "finalizada",
   ) => {
     try {
-      // CORREÇÃO: Ordem da query
       const { error } = await db
         .from("commissions")
-        .eq("id", commission.id) // .eq() antes de .update()
-        .update({ status: newStatus });
+        .update({ status: newStatus })
+        .eq("id", commission.id);
 
       if (error) throw error;
 
@@ -209,43 +206,43 @@ export default function Commissions() {
                 <DialogTitle>Nova Comissão</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="nome">Nome *</Label>
-                  <Input
-                    id="nome"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="descricao">Descrição</Label>
-                  <Textarea
-                    id="descricao"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ano">Ano</Label>
-                  <Input
-                    id="ano"
-                    type="number"
-                    value={formData.year}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        year: parseInt(e.target.value),
-                      })
-                    }
-                    required
-                  />
-                </div>
+                 <div>
+                   <Label htmlFor="nome">Nome *</Label>
+                   <Input
+                     id="nome"
+                     value={formData.nome}
+                     onChange={(e) =>
+                       setFormData({ ...formData, nome: e.target.value })
+                     }
+                     required
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="descricao">Descrição</Label>
+                   <Textarea
+                     id="descricao"
+                     value={formData.descricao}
+                     onChange={(e) =>
+                       setFormData({ ...formData, descricao: e.target.value })
+                     }
+                     rows={3}
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="ano">Ano</Label>
+                   <Input
+                     id="ano"
+                     type="number"
+                     value={formData.ano}
+                     onChange={(e) =>
+                       setFormData({
+                         ...formData,
+                         ano: parseInt(e.target.value),
+                       })
+                     }
+                     required
+                   />
+                 </div>
                 <div>
                   <Label htmlFor="survey">Vincular Pesquisa de Sugestões (Opcional)</Label>
                   <Select
@@ -259,11 +256,11 @@ export default function Commissions() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhuma</SelectItem>
-                      {surveys.map((survey) => (
-                        <SelectItem key={survey.id} value={survey.id}>
-                          {survey.title} ({survey.status})
-                        </SelectItem>
-                      ))}
+                       {surveys.map((survey) => (
+                         <SelectItem key={survey.id} value={survey.id}>
+                           {survey.titulo} ({survey.status})
+                         </SelectItem>
+                       ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -301,19 +298,19 @@ export default function Commissions() {
               key={commission.id}
               className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => navigate(`/commissions/${commission.id}`)}
-            >
-              <CardHeader>
-                <CardTitle>{commission.name}</CardTitle>
-                <CardDescription>
-                  Ano: {commission.year} • Código: {commission.link_code}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {commission.description && (
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {commission.description}
-                  </p>
-                )}
+             >
+               <CardHeader>
+                 <CardTitle>{commission.nome}</CardTitle>
+                 <CardDescription>
+                   Ano: {commission.ano} • Código: {commission.link_code}
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 {commission.descricao && (
+                   <p className="text-sm text-muted-foreground mb-4">
+                     {commission.descricao}
+                   </p>
+                 )}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
@@ -322,29 +319,29 @@ export default function Commissions() {
                   </div>
                   <div className="flex gap-2">
                     {commission.status === "draft" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateStatus(commission, "open");
-                        }}
-                      >
-                        Abrir
-                      </Button>
-                    )}
-                    {commission.status === "open" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateStatus(commission, "closed");
-                        }}
-                      >
-                        Finalizar
-                      </Button>
-                    )}
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           updateStatus(commission, "aberta");
+                         }}
+                       >
+                         Abrir
+                       </Button>
+                     )}
+                     {commission.status === "aberta" && (
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           updateStatus(commission, "finalizada");
+                         }}
+                       >
+                         Finalizar
+                       </Button>
+                     )}
                   </div>
                 </div>
               </CardContent>

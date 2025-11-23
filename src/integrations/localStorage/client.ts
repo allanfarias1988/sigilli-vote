@@ -25,16 +25,18 @@ type TableUpdate<T extends TableName> =
 // Estrutura completa do nosso banco de dados local
 interface LocalDatabase {
   tenants: TableRow<"tenants">[];
-  users: TableRow<"users">[];
+  profiles: TableRow<"profiles">[];
   members: TableRow<"members">[];
   commissions: TableRow<"commissions">[];
   commission_roles: TableRow<"commission_roles">[];
   ballots: TableRow<"ballots">[];
   votes: TableRow<"votes">[];
-  // NOVAS TABELAS ADICIONADAS PARA O MÓDULO DE PESQUISAS
   surveys: TableRow<"surveys">[];
   survey_items: TableRow<"survey_items">[];
   survey_votes: TableRow<"survey_votes">[];
+  user_roles: TableRow<"user_roles">[];
+  short_links: TableRow<"short_links">[];
+  audit_log: TableRow<"audit_log">[];
 }
 
 const LOCAL_DB_KEY = "SIGNA_LOCAL_DB";
@@ -48,23 +50,18 @@ const getInitialMockData = (): LocalDatabase => {
     tenants: [
       {
         id: defaultTenantId,
-        name: "Igreja Adventista Central",
+        nome: "Igreja Adventista Central",
         slug: "iasd-central",
         timezone: "America/Sao_Paulo",
         created_at: new Date().toISOString(),
+        ano_corrente: new Date().getFullYear(),
+        logo_url: null,
       },
     ],
-    users: [
-      {
-        id: "user-001",
-        tenant_id: defaultTenantId,
-        name: "Admin da Comissão",
-        email: "admin@example.com",
-        phone: "11987654321",
-        role: "commission_admin",
-        created_at: new Date().toISOString(),
-      },
-    ],
+    profiles: [],
+    user_roles: [],
+    short_links: [],
+    audit_log: [],
     members: [
       {
         id: "mem-001",
@@ -183,71 +180,96 @@ const getInitialMockData = (): LocalDatabase => {
       {
         id: "mem-007",
         tenant_id: defaultTenantId,
-        full_name: "Lucas Lima",
-        nickname: "Lucas",
+        nome_completo: "Lucas Lima",
+        apelido: "Lucas",
         email: "lucas.lima@example.com",
-        phone: "11999990007",
-        birth_date: "2000-02-20",
-        baptism_year: 2020,
-        is_active: true,
+        telefone: "11999990007",
+        data_nasc: "2000-02-20",
+        ano_batismo: 2020,
+        apto: true,
         created_at: new Date().toISOString(),
-        avatar_url: null,
+        imagem_url: null,
+        cargos_atuais: [],
+        endereco: null,
+        estado_civil: null,
+        interesses: [],
+        tempo_no_cargo: null,
+        updated_at: new Date().toISOString(),
       },
       {
         id: "mem-008",
         tenant_id: defaultTenantId,
-        full_name: "Fernanda Martins",
-        nickname: "Fê",
+        nome_completo: "Fernanda Martins",
+        apelido: "Fê",
         email: "fernanda.martins@example.com",
-        phone: "11999990008",
-        birth_date: "1998-12-12",
-        baptism_year: 2018,
-        is_active: true,
+        telefone: "11999990008",
+        data_nasc: "1998-12-12",
+        ano_batismo: 2018,
+        apto: true,
         created_at: new Date().toISOString(),
-        avatar_url: null,
+        imagem_url: null,
+        cargos_atuais: [],
+        endereco: null,
+        estado_civil: null,
+        interesses: [],
+        tempo_no_cargo: null,
+        updated_at: new Date().toISOString(),
       },
       {
         id: "mem-009",
         tenant_id: defaultTenantId,
-        full_name: "Ricardo Almeida",
-        nickname: "Ricardo",
+        nome_completo: "Ricardo Almeida",
+        apelido: "Ricardo",
         email: "ricardo.almeida@example.com",
-        phone: "11999990009",
-        birth_date: "1970-06-18",
-        baptism_year: 1990,
-        is_active: true,
+        telefone: "11999990009",
+        data_nasc: "1970-06-18",
+        ano_batismo: 1990,
+        apto: true,
         created_at: new Date().toISOString(),
-        avatar_url: null,
+        imagem_url: null,
+        cargos_atuais: [],
+        endereco: null,
+        estado_civil: null,
+        interesses: [],
+        tempo_no_cargo: null,
+        updated_at: new Date().toISOString(),
       },
       {
         id: "mem-010",
         tenant_id: defaultTenantId,
-        full_name: "Camila Rodrigues",
-        nickname: "Mila",
+        nome_completo: "Camila Rodrigues",
+        apelido: "Mila",
         email: "camila.rodrigues@example.com",
-        phone: "11999990010",
-        birth_date: "1993-04-22",
-        baptism_year: 2013,
-        is_active: false,
+        telefone: "11999990010",
+        data_nasc: "1993-04-22",
+        ano_batismo: 2013,
+        apto: false,
         created_at: new Date().toISOString(),
-        avatar_url: null,
+        imagem_url: null,
+        cargos_atuais: [],
+        endereco: null,
+        estado_civil: null,
+        interesses: [],
+        tempo_no_cargo: null,
+        updated_at: new Date().toISOString(),
       },
     ],
     commissions: [
       {
         id: defaultCommissionId,
         tenant_id: defaultTenantId,
-        name: "Comissão de Nomeações 2024",
-        year: 2024,
-        description:
+        nome: "Comissão de Nomeações 2024",
+        ano: 2024,
+        descricao:
           "Comissão para nomear os oficiais da igreja para o próximo ano.",
         survey_id: null,
         anonimato_modo: "anonimo",
         status: "draft",
         link_code: "xyz123",
-        created_by: "user-001",
+        created_by: null,
         created_at: new Date().toISOString(),
         finalized_at: null,
+        finalization_key: null,
       },
     ],
     commission_roles: [

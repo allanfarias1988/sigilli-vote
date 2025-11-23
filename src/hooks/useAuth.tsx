@@ -73,29 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isLocal) {
       // LÓGICA LOCAL
       console.log("Executando signUp local...");
-      const { data: existingUsers, error: selectError } = await localStorageDB
-        .from("users")
-        .eq("email", email) // CORREÇÃO: .eq() ANTES de .select()
-        .select();
-
-      if (selectError) return { error: selectError };
-      if (existingUsers && existingUsers.length > 0) {
-        return { error: new Error("Este email já está cadastrado.") };
-      }
-
-      const { data: newUser, error: insertError } = await localStorageDB
-        .from("users")
-        .insert({
-          email,
-          name: nome,
-          role: "commission_admin", // Padrão para novos cadastros locais
-        });
-
-      if (insertError) return { error: insertError };
-
+      // Em modo local, não temos tabela users, vamos criar o profile direto
       // Simula login automático após o cadastro
       await signIn(email, password);
-
       return { error: null };
     } else {
       // LÓGICA SUPABASE
@@ -110,31 +90,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     if (isLocal) {
-      // LÓGICA LOCAL
+      // LÓGICA LOCAL - Criar usuário mockado
       console.log("Executando signIn local...");
-      const { data: users, error } = await localStorageDB
-        .from("users")
-        .eq("email", email) // CORREÇÃO: .eq() ANTES de .select()
-        .select();
-
-      if (error) return { error };
-      if (!users || users.length === 0) {
-        return { error: new Error("Credenciais inválidas.") };
-      }
-
-      const userToLogin = users[0] as unknown as User;
+      
+      const mockUser = {
+        id: crypto.randomUUID(),
+        email,
+        user_metadata: { nome: 'Usuário Local' },
+      } as unknown as User;
 
       const mockSession = {
-        user: userToLogin,
+        user: mockUser,
         access_token: `mock-token-${Date.now()}`,
         refresh_token: `mock-refresh-${Date.now()}`,
       } as unknown as Session;
 
       sessionStorage.setItem("signa-mock-session", JSON.stringify(mockSession));
-      setUser(userToLogin);
+      setUser(mockUser);
       setSession(mockSession);
 
-      navigate("/dashboard"); // Redireciona para o dashboard após o login
+      navigate("/onboarding"); // Redireciona para onboarding
       return { error: null };
     } else {
       // LÓGICA SUPABASE
