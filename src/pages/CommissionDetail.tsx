@@ -160,15 +160,14 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { data: commissionData, error: commissionError } = await db
         .from("commissions")
-        .eq("id", id)
         .select("*")
+        .eq("id", id)
         .single();
 
       if (commissionError) throw commissionError;
-      // Adicionar campo 'nome' para compatibilidade com FinalizationDialog
       const commissionWithNome = {
         ...commissionData,
-        nome: commissionData.name || commissionData.nome || "",
+        nome: commissionData.nome || "",
         identification_mode: commissionData.anonimato_modo || commissionData.identification_mode
       };
       setCommission(commissionWithNome);
@@ -178,8 +177,8 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { data: rolesData, error: rolesError } = await db
         .from("commission_roles")
-        .eq("commission_id", id)
-        .select("*");
+        .select("*")
+        .eq("commission_id", id);
 
       if (rolesError) throw rolesError;
 
@@ -355,7 +354,7 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { error } = await db
         .from("commissions")
-        .update({ anonimato_modo: selectedIdentificationMode })
+        .update({ anonimato_modo: selectedIdentificationMode as "anonimo" | "obrigatorio" | "opcional" })
         .eq("id", id);
 
       if (error) throw error;

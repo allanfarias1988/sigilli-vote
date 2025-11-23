@@ -14,9 +14,9 @@ import { QRCodeSVG } from 'qrcode.react';
 
 interface SurveyItem {
   id: string;
-  role_name: string;
-  max_suggestions: number;
-  order: number;
+  cargo_nome: string;
+  max_sugestoes: number;
+  ordem: number;
 }
 
 export default function SurveyDetail() {
@@ -29,8 +29,8 @@ export default function SurveyDetail() {
   const [items, setItems] = useState<SurveyItem[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
-    role_name: '',
-    max_suggestions: 2
+    cargo_nome: '',
+    max_sugestoes: 2
   });
   const [results, setResults] = useState<any[]>([]);
 
@@ -56,8 +56,7 @@ export default function SurveyDetail() {
         .eq('survey_id', id);
 
       if (itemsError) throw itemsError;
-      // Sort items client-side
-      const sortedItems = (itemsData || []).sort((a, b) => a.order - b.order);
+      const sortedItems = (itemsData || []).sort((a, b) => a.ordem - b.ordem);
       setItems(sortedItems);
 
       await loadResults();
@@ -76,12 +75,11 @@ export default function SurveyDetail() {
   const loadResults = async () => {
     if (!id) return;
     try {
-      // 1. Get all members to map IDs to names
       const { data: members, error: membersError } = await db
         .from("members")
-        .select("id, full_name");
+        .select("id, nome_completo");
       if (membersError) throw membersError;
-      const memberMap = new Map(members?.map((m) => [m.id, m.full_name]));
+      const memberMap = new Map(members?.map((m) => [m.id, m.nome_completo]));
 
       // 2. Get all votes for this survey
       const { data: votes, error: votesError } = await db
@@ -94,19 +92,17 @@ export default function SurveyDetail() {
         return;
       }
 
-      // 3. Aggregate the suggestions
-      const suggestionCounts: { [roleName: string]: { [memberId: string]: number } } = {};
+      const suggestionCounts: { [cargoNome: string]: { [memberId: string]: number } } = {};
 
       for (const vote of votes) {
-        if (!suggestionCounts[vote.role_name]) {
-          suggestionCounts[vote.role_name] = {};
+        if (!suggestionCounts[vote.cargo_nome]) {
+          suggestionCounts[vote.cargo_nome] = {};
         }
-        for (const suggestedMemberId of vote.suggestions) {
-          if (!suggestionCounts[vote.role_name][suggestedMemberId]) {
-            suggestionCounts[vote.role_name][suggestedMemberId] = 0;
-          }
-          suggestionCounts[vote.role_name][suggestedMemberId]++;
+        const memberId = vote.member_id;
+        if (!suggestionCounts[vote.cargo_nome][memberId]) {
+          suggestionCounts[vote.cargo_nome][memberId] = 0;
         }
+        suggestionCounts[vote.cargo_nome][memberId] += vote.vote_count || 1;
       }
 
       // 4. Format for display
@@ -139,16 +135,16 @@ export default function SurveyDetail() {
         .from('survey_items')
         .insert({
           survey_id: id,
-          role_name: formData.role_name,
-          max_suggestions: formData.max_suggestions,
-          order: items.length + 1
+          cargo_nome: formData.cargo_nome,
+          max_sugestoes: formData.max_sugestoes,
+          ordem: items.length + 1
         });
 
       if (error) throw error;
 
       toast({ title: 'Cargo adicionado com sucesso!' });
       setIsDialogOpen(false);
-      setFormData({ role_name: '', max_suggestions: 2 });
+      setFormData({ cargo_nome: '', max_sugestoes: 2 });
       loadData();
     } catch (error) {
       console.error('Error adding item:', error);
@@ -166,8 +162,8 @@ export default function SurveyDetail() {
     try {
       const { error } = await db
         .from('survey_items')
-        .eq('id', itemId)
-        .delete();
+        .delete()
+        .eq('id', itemId);
 
       if (error) throw error;
 
@@ -214,7 +210,7 @@ export default function SurveyDetail() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">{survey.title}</h1>
+              <h1 className="text-2xl font-bold">{survey.titulo}</h1>
               <p className="text-sm text-muted-foreground">Código: {survey.link_code}</p>
             </div>
           </div>
@@ -274,22 +270,22 @@ export default function SurveyDetail() {
                   </DialogHeader>
                   <form onSubmit={handleAddItem} className="space-y-4">
                     <div>
-                      <Label htmlFor="role_name">Nome do Cargo *</Label>
+                      <Label htmlFor="cargo_nome">Nome do Cargo *</Label>
                       <Input
-                        id="role_name"
-                        value={formData.role_name}
-                        onChange={(e) => setFormData({ ...formData, role_name: e.target.value })}
+                        id="cargo_nome"
+                        value={formData.cargo_nome}
+                        onChange={(e) => setFormData({ ...formData, cargo_nome: e.target.value })}
                         placeholder="Ex: Ancião, Diácono, Tesoureiro..."
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="max_suggestions">Máximo de Sugestões</Label>
+                      <Label htmlFor="max_sugestoes">Máximo de Sugestões</Label>
                       <Input
-                        id="max_suggestions"
+                        id="max_sugestoes"
                         type="number"
-                        value={formData.max_suggestions}
-                        onChange={(e) => setFormData({ ...formData, max_suggestions: parseInt(e.target.value) })}
+                        value={formData.max_sugestoes}
+                        onChange={(e) => setFormData({ ...formData, max_sugestoes: parseInt(e.target.value) })}
                         min={1}
                         required
                       />
@@ -307,7 +303,7 @@ export default function SurveyDetail() {
                 <Card key={item.id}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>{item.role_name}</span>
+                      <span>{item.cargo_nome}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -319,7 +315,7 @@ export default function SurveyDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
-                      Máximo de sugestões: {item.max_suggestions}
+                      Máximo de sugestões: {item.max_sugestoes}
                     </p>
                   </CardContent>
                 </Card>

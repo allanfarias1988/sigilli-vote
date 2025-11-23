@@ -28,7 +28,7 @@ export default function PrintableResults() {
 
   const loadCommissionDetails = async (id: string) => {
     try {
-      const { data, error } = await db.from("commissions").eq("id", id).single();
+      const { data, error } = await db.from("commissions").select("*").eq("id", id).single();
       if (error) throw error;
       setCommission(data);
     } catch (error) {
@@ -41,21 +41,21 @@ export default function PrintableResults() {
     try {
       const { data: members, error: membersError } = await db
         .from("members")
-        .select("id, full_name");
+        .select("id, nome_completo");
       if (membersError) throw membersError;
-      const memberMap = new Map(members?.map((m) => [m.id, m.full_name]));
+      const memberMap = new Map(members?.map((m) => [m.id, m.nome_completo]));
 
       const { data: roles, error: rolesError } = await db
         .from("commission_roles")
-        .eq("commission_id", commissionId)
-        .select("id, role_name");
+        .select("id, nome_cargo")
+        .eq("commission_id", commissionId);
       if (rolesError) throw rolesError;
-      const roleMap = new Map(roles?.map((r) => [r.id, r.role_name]));
+      const roleMap = new Map(roles?.map((r) => [r.id, r.nome_cargo]));
 
       const { data: ballots, error: ballotsError } = await db
         .from("ballots")
-        .eq("commission_id", commissionId)
-        .select("id, role_id");
+        .select("id, role_id")
+        .eq("commission_id", commissionId);
       if (ballotsError) throw ballotsError;
       if (!ballots || ballots.length === 0) {
         setResults([]);
@@ -67,8 +67,8 @@ export default function PrintableResults() {
       for (const ballotId of ballotIds) {
         const { data: votes, error: votesError } = await db
           .from("votes")
-          .eq("ballot_id", ballotId)
-          .select("member_id");
+          .select("member_id, ballot_id")
+          .eq("ballot_id", ballotId);
         if (votesError) throw votesError;
         if (votes) allVotes.push(...votes);
       }
@@ -94,7 +94,7 @@ export default function PrintableResults() {
       const formattedResults = Object.entries(voteCounts).map(
         ([roleId, memberVotes]) => {
           return {
-            roleName: roleMap.get(roleId) || "Cargo Desconhecido",
+            roleName: (roleMap.get(roleId) || "Cargo Desconhecido") as string,
             votes: Object.entries(memberVotes)
               .map(([memberId, count]) => ({
                 memberId,
@@ -126,9 +126,9 @@ export default function PrintableResults() {
     <div className="p-8">
       {commission && (
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold">{commission.name}</h1>
+          <h1 className="text-3xl font-bold">{commission.nome}</h1>
           <p className="text-lg text-muted-foreground">
-            {commission.description}
+            {commission.descricao}
           </p>
         </div>
       )}
