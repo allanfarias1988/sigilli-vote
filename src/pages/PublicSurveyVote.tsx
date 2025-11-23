@@ -24,22 +24,22 @@ import { Label } from "@/components/ui/label";
 // Interfaces alinhadas com o schema do localStorage/client.ts
 interface Survey {
   id: string;
-  title: string;
-  description?: string | null;
-  status: "open" | "closed";
+  titulo: string;
+  descricao?: string | null;
+  status: "aberta" | "fechada";
   tenant_id: string;
 }
 
 interface SurveyItem {
   id: string;
-  role_name: string;
-  max_suggestions: number;
-  order?: number; // Adicionado para consistência, se não existir no mock
+  cargo_nome: string;
+  max_sugestoes: number;
+  ordem?: number;
 }
 
 interface Member {
   id: string;
-  full_name: string;
+  nome_completo: string;
 }
 
 export default function PublicSurveyVote() {
@@ -67,8 +67,8 @@ export default function PublicSurveyVote() {
       // CORREÇÃO: Ordem da query
       const { data: surveyData, error: surveyError } = await db
         .from("surveys")
-        .eq("link_code", code)
         .select("*")
+        .eq("link_code", code)
         .single();
 
       if (surveyError) throw surveyError;
@@ -77,36 +77,36 @@ export default function PublicSurveyVote() {
         return;
       }
 
-      if (surveyData.status !== "open") {
+      if (surveyData.status !== "aberta") {
         toast({
           title: "Pesquisa fechada",
           description: "Esta pesquisa não está mais aceitando sugestões.",
           variant: "destructive",
         });
-        setSurvey(surveyData as Survey); // Define a pesquisa para exibir o título
+        setSurvey(surveyData as unknown as Survey); // Define a pesquisa para exibir o título
         setLoading(false);
         return;
       }
 
-      setSurvey(surveyData as Survey);
+      setSurvey(surveyData as unknown as Survey);
 
-      // CORREÇÃO: Ordem da query e nome do campo 'role_name'
+      // CORREÇÃO: Ordem da query e nome do campo 'cargo_nome'
       const { data: itemsData, error: itemsError } = await db
         .from("survey_items")
-        .eq("survey_id", surveyData.id)
-        .select("*");
-      // .order('order'); // .order() a ser implementado
+        .select("*")
+        .eq("survey_id", surveyData.id);
+      // .order('ordem'); // .order() a ser implementado
 
       if (itemsError) throw itemsError;
-      const surveyItems = (itemsData || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const surveyItems = (itemsData || []).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
       setItems(surveyItems);
 
-      // CORREÇÃO: Ordem da query e nome do campo 'full_name'
+      // CORREÇÃO: Ordem da query e nome do campo 'nome_completo'
       const { data: membersData, error: membersError } = await db
         .from("members")
+        .select("id, nome_completo")
         .eq("tenant_id", surveyData.tenant_id)
-        .eq("is_active", true)
-        .select("id, full_name");
+        .eq("apto", true);
 
       if (membersError) throw membersError;
       setMembers(membersData || []);
@@ -114,7 +114,7 @@ export default function PublicSurveyVote() {
       // Inicializa o objeto de sugestões
       const initialSuggestions: { [itemId: string]: string[] } = {};
       surveyItems.forEach((item: SurveyItem) => {
-        initialSuggestions[item.id] = Array(item.max_suggestions).fill("");
+        initialSuggestions[item.id] = Array(item.max_sugestoes).fill("");
       });
       setSuggestions(initialSuggestions);
     } catch (error) {
@@ -158,9 +158,9 @@ export default function PublicSurveyVote() {
 
           return {
             survey_id: survey.id,
-            role_name: item.role_name,
-            suggestions: validSuggestions,
+            cargo_nome: item.cargo_nome,
             member_id: null, // Anonymous public vote
+            vote_count: validSuggestions.length
           };
         })
         .filter((vote): vote is NonNullable<typeof vote> => vote !== null);
@@ -219,7 +219,7 @@ export default function PublicSurveyVote() {
     );
   }
 
-  if (submitted || survey.status === "closed") {
+  if (submitted || survey.status === "fechada") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
         <Card className="max-w-md w-full text-center">
@@ -228,12 +228,12 @@ export default function PublicSurveyVote() {
               <CheckCircle className="h-10 w-10 text-green-600" />
             </div>
             <CardTitle>
-              {survey.status === "closed"
+              {survey.status === "fechada"
                 ? "Pesquisa Encerrada"
                 : "Sugestões Enviadas!"}
             </CardTitle>
             <CardDescription>
-              Obrigado por sua participação na pesquisa "{survey.title}".
+              Obrigado por sua participação na pesquisa "{survey.titulo}".
             </CardDescription>
           </CardHeader>
         </Card>
@@ -246,21 +246,21 @@ export default function PublicSurveyVote() {
       <div className="container mx-auto max-w-2xl py-8">
         <Card>
           <CardHeader>
-            <CardTitle>{survey.title}</CardTitle>
-            {survey.description && (
-              <CardDescription>{survey.description}</CardDescription>
+            <CardTitle>{survey.titulo}</CardTitle>
+            {survey.descricao && (
+              <CardDescription>{survey.descricao}</CardDescription>
             )}
           </CardHeader>
           <CardContent className="space-y-6">
             {items.map((item) => (
               <div key={item.id} className="space-y-3">
                 <Label className="font-semibold text-lg">
-                  {item.role_name}
+                  {item.cargo_nome}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Selecione até {item.max_suggestions} sugestões
+                  Selecione até {item.max_sugestoes} sugestões
                 </p>
-                {Array.from({ length: item.max_suggestions }).map(
+                {Array.from({ length: item.max_sugestoes }).map(
                   (_, index) => (
                     <Select
                       key={index}
@@ -275,7 +275,7 @@ export default function PublicSurveyVote() {
                       <SelectContent>
                         {members.map((member) => (
                           <SelectItem key={member.id} value={member.id}>
-                            {member.full_name}
+                            {member.nome_completo}
                           </SelectItem>
                         ))}
                       </SelectContent>

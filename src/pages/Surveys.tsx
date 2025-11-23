@@ -27,12 +27,13 @@ import { Textarea } from "@/components/ui/textarea";
 // Interface alinhada com o schema do localStorage/client.ts
 interface Survey {
   id: string;
-  title: string;
-  description?: string | null;
-  status: "open" | "closed";
+  titulo: string;
+  descricao?: string | null;
+  status: "aberta" | "fechada";
   link_code: string;
   created_at: string;
   tenant_id: string;
+  ano: number;
 }
 
 export default function Surveys() {
@@ -63,8 +64,8 @@ export default function Surveys() {
       // CORREÇÃO: Ordem da query
       const { data: surveysData, error } = await db
         .from("surveys")
-        .eq("tenant_id", tenantId)
-        .select("*");
+        .select("*")
+        .eq("tenant_id", tenantId);
       // .order('created_at', { ascending: false }); // .order() a ser implementado
 
       if (error) throw error;
@@ -92,10 +93,11 @@ export default function Surveys() {
     try {
       const { error } = await db.from("surveys").insert({
         tenant_id: tenantId,
-        title: formData.title,
-        description: formData.description || null,
+        titulo: formData.title,
+        descricao: formData.description || null,
         link_code: generateLinkCode(),
-        status: "open",
+        status: "aberta",
+        ano: new Date().getFullYear()
       });
 
       if (error) throw error;
@@ -117,17 +119,17 @@ export default function Surveys() {
   const toggleStatus = async (survey: Survey) => {
     if (!tenantId) return;
     try {
-      const newStatus = survey.status === "open" ? "closed" : "open";
+      const newStatus = survey.status === "aberta" ? "fechada" : "aberta";
       // CORREÇÃO: Ordem da query
       const { error } = await db
         .from("surveys")
-        .eq("id", survey.id)
-        .update({ status: newStatus });
+        .update({ status: newStatus })
+        .eq("id", survey.id);
 
       if (error) throw error;
 
       toast({
-        title: `Pesquisa ${newStatus === "open" ? "reaberta" : "fechada"} com sucesso!`,
+        title: `Pesquisa ${newStatus === "aberta" ? "reaberta" : "fechada"} com sucesso!`,
       });
       loadData(tenantId);
     } catch (error) {
@@ -214,24 +216,24 @@ export default function Surveys() {
               onClick={() => navigate(`/surveys/${survey.id}`)}
             >
               <CardHeader>
-                <CardTitle>{survey.title}</CardTitle>
+                <CardTitle>{survey.titulo}</CardTitle>
                 <CardDescription>Código: {survey.link_code}</CardDescription>
               </CardHeader>
               <CardContent>
-                {survey.description && (
+                {survey.descricao && (
                   <p className="text-sm text-muted-foreground mb-4">
-                    {survey.description}
+                    {survey.descricao}
                   </p>
                 )}
                 <div className="flex items-center justify-between">
                   <span
                     className={`text-sm font-medium ${
-                      survey.status === "open"
+                      survey.status === "aberta"
                         ? "text-green-600"
                         : "text-red-600"
                     }`}
                   >
-                    {survey.status === "open" ? "Aberta" : "Fechada"}
+                    {survey.status === "aberta" ? "Aberta" : "Fechada"}
                   </span>
                   <Button
                     variant="outline"
@@ -241,7 +243,7 @@ export default function Surveys() {
                       toggleStatus(survey);
                     }}
                   >
-                    {survey.status === "open" ? "Fechar" : "Reabrir"}
+                    {survey.status === "aberta" ? "Fechar" : "Reabrir"}
                   </Button>
                 </div>
               </CardContent>

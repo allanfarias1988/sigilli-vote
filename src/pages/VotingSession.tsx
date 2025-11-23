@@ -22,10 +22,9 @@ import { searchMembers } from "@/lib/search-utils";
 // Tipos baseados no nosso localStorage/client.ts
 interface Commission {
   id: string;
-  name: string;
-  nome?: string;
-  description: string | null;
-  year: number;
+  nome: string;
+  descricao: string | null;
+  ano: number;
   link_code: string;
   status: string;
   finalized_at: string | null;
@@ -127,7 +126,7 @@ export default function VotingSession() {
       if (error) throw error;
       setCommission({
         ...data,
-        name: data.nome || data.name // Normalizar nome
+        nome: data.nome // Normalizar nome
       });
     } catch (error) {
       console.error("Error loading commission details:", error);
@@ -146,8 +145,8 @@ export default function VotingSession() {
       // @ts-ignore
       const { data, error } = await db
         .from("commission_roles")
-        .eq("commission_id", id)
-        .select("*");
+        .select("*")
+        .eq("commission_id", id);
 
       if (error) throw error;
 
@@ -388,10 +387,10 @@ export default function VotingSession() {
 
       <main className="container mx-auto px-4 py-8">
         <h2 className="text-3xl font-bold text-center mb-2">
-          {commission.name}
+          {commission.nome}
         </h2>
         <p className="text-muted-foreground text-center mb-8">
-          {commission.description}
+          {commission.descricao}
         </p>
 
         {currentRole ? (

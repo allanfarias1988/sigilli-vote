@@ -14,9 +14,9 @@ import { QRCodeSVG } from 'qrcode.react';
 
 interface SurveyItem {
   id: string;
-  role_name: string;
-  max_suggestions: number;
-  order: number;
+  cargo_nome: string;
+  max_sugestoes: number;
+  ordem: number;
 }
 
 export default function SurveyDetail() {
@@ -57,7 +57,7 @@ export default function SurveyDetail() {
 
       if (itemsError) throw itemsError;
       // Sort items client-side
-      const sortedItems = (itemsData || []).sort((a, b) => a.order - b.order);
+      const sortedItems = ((itemsData || []).sort((a, b) => a.ordem - b.ordem)) as SurveyItem[];
       setItems(sortedItems);
 
       await loadResults();
@@ -79,9 +79,9 @@ export default function SurveyDetail() {
       // 1. Get all members to map IDs to names
       const { data: members, error: membersError } = await db
         .from("members")
-        .select("id, full_name");
+        .select("id, nome_completo");
       if (membersError) throw membersError;
-      const memberMap = new Map(members?.map((m) => [m.id, m.full_name]));
+      const memberMap = new Map(members?.map((m) => [m.id, m.nome_completo]));
 
       // 2. Get all votes for this survey
       const { data: votes, error: votesError } = await db
@@ -95,18 +95,17 @@ export default function SurveyDetail() {
       }
 
       // 3. Aggregate the suggestions
-      const suggestionCounts: { [roleName: string]: { [memberId: string]: number } } = {};
+      const suggestionCounts: { [cargoNome: string]: { [memberId: string]: number } } = {};
 
       for (const vote of votes) {
-        if (!suggestionCounts[vote.role_name]) {
-          suggestionCounts[vote.role_name] = {};
+        if (!suggestionCounts[vote.cargo_nome]) {
+          suggestionCounts[vote.cargo_nome] = {};
         }
-        for (const suggestedMemberId of vote.suggestions) {
-          if (!suggestionCounts[vote.role_name][suggestedMemberId]) {
-            suggestionCounts[vote.role_name][suggestedMemberId] = 0;
-          }
-          suggestionCounts[vote.role_name][suggestedMemberId]++;
+        // Incrementar vote_count para cada membro votado
+        if (!suggestionCounts[vote.cargo_nome][vote.member_id]) {
+          suggestionCounts[vote.cargo_nome][vote.member_id] = 0;
         }
+        suggestionCounts[vote.cargo_nome][vote.member_id] += vote.vote_count || 1;
       }
 
       // 4. Format for display
@@ -139,9 +138,9 @@ export default function SurveyDetail() {
         .from('survey_items')
         .insert({
           survey_id: id,
-          role_name: formData.role_name,
-          max_suggestions: formData.max_suggestions,
-          order: items.length + 1
+          cargo_nome: formData.role_name,
+          max_sugestoes: formData.max_suggestions,
+          ordem: items.length + 1
         });
 
       if (error) throw error;
@@ -166,8 +165,8 @@ export default function SurveyDetail() {
     try {
       const { error } = await db
         .from('survey_items')
-        .eq('id', itemId)
-        .delete();
+        .delete()
+        .eq('id', itemId);
 
       if (error) throw error;
 
@@ -307,7 +306,7 @@ export default function SurveyDetail() {
                 <Card key={item.id}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>{item.role_name}</span>
+                      <span>{item.cargo_nome}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -319,7 +318,7 @@ export default function SurveyDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
-                      Máximo de sugestões: {item.max_suggestions}
+                      Máximo de sugestões: {item.max_sugestoes}
                     </p>
                   </CardContent>
                 </Card>

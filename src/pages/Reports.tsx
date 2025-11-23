@@ -51,10 +51,10 @@ export default function Reports() {
       const totalCommissions = commissionsData?.length || 0;
 
       const activeSurveys = (surveysData || []).filter(
-        (s) => s.status === "open",
+        (s) => s.status === "aberta",
       ).length;
       const activeCommissions = (commissionsData || []).filter(
-        (c) => c.status === "open",
+        (c) => c.status === "aberta",
       ).length;
 
       setStats({
