@@ -215,25 +215,25 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { data: members, error: membersError } = await db
         .from("members")
-        .select("id, full_name, nome_completo");
+        .select("id, nome_completo");
       if (membersError) throw membersError;
-      const memberMap = new Map(members?.map((m: any) => [m.id, m.nome_completo || m.full_name]));
+      const memberMap = new Map(members?.map((m: any) => [m.id, m.nome_completo]));
 
       // 2. Buscar todos os cargos da comissão para mapear IDs para nomes
       // @ts-ignore
       const { data: roles, error: rolesError } = await db
         .from("commission_roles")
-        .eq("commission_id", id)
-        .select("id, role_name, nome_cargo");
+        .select("id, nome_cargo")
+        .eq("commission_id", id);
       if (rolesError) throw rolesError;
-      const roleMap = new Map(roles?.map((r: any) => [r.id, r.nome_cargo || r.role_name]));
+      const roleMap = new Map(roles?.map((r: any) => [r.id, r.nome_cargo]));
 
       // 3. Buscar todas as cédulas (ballots) da comissão
       // @ts-ignore
       const { data: ballots, error: ballotsError } = await db
         .from("ballots")
-        .eq("commission_id", id)
-        .select("id, role_id");
+        .select("id, role_id")
+        .eq("commission_id", id);
       if (ballotsError) throw ballotsError;
       if (!ballots || ballots.length === 0) {
         setResults([]); // Sem cédulas, sem resultados
@@ -248,8 +248,8 @@ export default function CommissionDetail() {
         // @ts-ignore
         const { data: votes, error: votesError } = await db
           .from("votes")
-          .eq("ballot_id", ballotId)
-          .select("member_id, ballot_id");
+          .select("member_id, ballot_id")
+          .eq("ballot_id", ballotId);
         if (votesError) throw votesError;
         if (votes) allVotes.push(...votes);
       }
@@ -276,7 +276,7 @@ export default function CommissionDetail() {
       const formattedResults = Object.entries(voteCounts).map(
         ([roleId, memberVotes]) => {
           return {
-            roleName: roleMap.get(roleId) || "Cargo Desconhecido",
+            roleName: (roleMap.get(roleId) || "Cargo Desconhecido") as string,
             votes: Object.entries(memberVotes)
               .map(([memberId, count]) => ({
                 memberId,
@@ -302,8 +302,8 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { error } = await db
         .from("commission_roles")
-        .eq("id", roleId)
-        .delete();
+        .delete()
+        .eq("id", roleId);
 
       if (error) throw error;
 
@@ -332,8 +332,8 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { error } = await db
         .from("commissions")
-        .eq("id", id)
-        .update({ survey_id: selectedSurveyId });
+        .update({ survey_id: selectedSurveyId })
+        .eq("id", id);
 
       if (error) throw error;
 
@@ -355,8 +355,8 @@ export default function CommissionDetail() {
       // @ts-ignore
       const { error } = await db
         .from("commissions")
-        .eq("id", id)
-        .update({ anonimato_modo: selectedIdentificationMode }); // Usando anonimato_modo
+        .update({ anonimato_modo: selectedIdentificationMode })
+        .eq("id", id);
 
       if (error) throw error;
 
