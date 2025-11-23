@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Importa nosso cliente local simulado
 import { db as localStorageDB } from "@/integrations/localStorage/client";
 
-const isLocal = import.meta.env.VITE_DATA_SOURCE === "local";
+const isLocal = import.meta.env.VITE_USE_LOCAL_STORAGE === "true";
 
 console.log(`[DB Provider] Usando: ${isLocal ? "LocalStorage" : "Supabase"}`);
 

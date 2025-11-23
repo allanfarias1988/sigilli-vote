@@ -19,21 +19,21 @@ import { Input } from "@/components/ui/input";
 // Interfaces alinhadas com o schema local
 interface Commission {
   id: string;
-  name: string;
-  description: string | null;
+  nome: string;
+  descricao: string | null;
   status: string;
   tenant_id: string;
 }
 
 interface CommissionRole {
   id: string;
-  role_name: string;
-  max_selections: number;
+  nome_cargo: string;
+  max_selecoes: number;
 }
 
 interface Member {
   id: string;
-  full_name: string;
+  nome_completo: string;
 }
 
 export default function PublicCommissionVote() {
@@ -62,7 +62,7 @@ export default function PublicCommissionVote() {
     } else {
       setFilteredMembers(
         members.filter((member) =>
-          member.full_name.toLowerCase().includes(searchTerm.toLowerCase()),
+          member.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()),
         ),
       );
     }
@@ -73,8 +73,8 @@ export default function PublicCommissionVote() {
       // CORREÇÃO: Ordem da query
       const { data: commissionData, error: commissionError } = await db
         .from("commissions")
-        .eq("link_code", code)
         .select("*")
+        .eq("link_code", code)
         .single();
 
       if (commissionError) throw commissionError;
@@ -83,35 +83,35 @@ export default function PublicCommissionVote() {
         return;
       }
 
-      if (commissionData.status === "closed") {
+      if (commissionData.status === "finalizada") {
         toast({
           title: "Votação encerrada",
           description: "Esta comissão não está mais aceitando votos.",
           variant: "destructive",
         });
-        setCommission(commissionData as Commission); // Ainda define a comissão para exibir o nome
+        setCommission(commissionData as unknown as Commission); // Ainda define a comissão para exibir o nome
         setLoading(false);
         return;
       }
-      setCommission(commissionData as Commission);
+      setCommission(commissionData as unknown as Commission);
 
       // CORREÇÃO: Ordem da query
       const { data: rolesData, error: rolesError } = await db
         .from("commission_roles")
+        .select("*")
         .eq("commission_id", commissionData.id)
-        .eq("is_active", true)
-        .select("*");
+        .eq("ativo", true);
 
       if (rolesError) throw rolesError;
-      const activeRoles = rolesData || [];
+      const activeRoles = (rolesData || []) as unknown as CommissionRole[];
       setRoles(activeRoles);
 
       // CORREÇÃO: Ordem da query
       const { data: membersData, error: membersError } = await db
         .from("members")
+        .select("id, nome_completo")
         .eq("tenant_id", commissionData.tenant_id)
-        .eq("is_active", true)
-        .select("id, full_name");
+        .eq("apto", true);
 
       if (membersError) throw membersError;
       setMembers(membersData || []);
@@ -138,7 +138,7 @@ export default function PublicCommissionVote() {
     setVotes((prev) => {
       const roleVotes = prev[roleId] || [];
       const role = roles.find((r) => r.id === roleId);
-      const maxSelections = role?.max_selections || 1;
+      const maxSelections = role?.max_selecoes || 1;
 
       if (roleVotes.includes(memberId)) {
         return { ...prev, [roleId]: roleVotes.filter((id) => id !== memberId) };
@@ -259,7 +259,7 @@ export default function PublicCommissionVote() {
                 : "Voto Registrado!"}
             </CardTitle>
             <CardDescription>
-              Obrigado por sua participação na comissão "{commission.name}".
+              Obrigado por sua participação na comissão "{commission.nome}".
             </CardDescription>
           </CardHeader>
         </Card>
@@ -272,9 +272,9 @@ export default function PublicCommissionVote() {
       <div className="container mx-auto max-w-4xl py-8">
         <Card>
           <CardHeader>
-            <CardTitle>{commission.name}</CardTitle>
-            {commission.description && (
-              <CardDescription>{commission.description}</CardDescription>
+            <CardTitle>{commission.nome}</CardTitle>
+            {commission.descricao && (
+              <CardDescription>{commission.descricao}</CardDescription>
             )}
           </CardHeader>
           <CardContent className="space-y-8">
@@ -291,10 +291,10 @@ export default function PublicCommissionVote() {
             {roles.map((role) => (
               <div key={role.id} className="space-y-4">
                 <div className="border-b pb-2">
-                  <h3 className="font-semibold text-lg">{role.role_name}</h3>
+                  <h3 className="font-semibold text-lg">{role.nome_cargo}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Selecione até {role.max_selections}{" "}
-                    {role.max_selections === 1 ? "pessoa" : "pessoas"}
+                    Selecione até {role.max_selecoes}{" "}
+                    {role.max_selecoes === 1 ? "pessoa" : "pessoas"}
                   </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -315,7 +315,7 @@ export default function PublicCommissionVote() {
                         htmlFor={`${role.id}-${member.id}`}
                         className="flex-1 cursor-pointer"
                       >
-                        {member.full_name}
+                        {member.nome_completo}
                       </Label>
                     </div>
                   ))}
