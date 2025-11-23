@@ -70,11 +70,10 @@ export default function PublicCommissionVote() {
 
   const loadCommission = async () => {
     try {
-      // CORREÇÃO: Ordem da query
       const { data: commissionData, error: commissionError } = await db
         .from("commissions")
-        .eq("link_code", code)
         .select("*")
+        .eq("link_code", code)
         .single();
 
       if (commissionError) throw commissionError;
@@ -95,12 +94,11 @@ export default function PublicCommissionVote() {
       }
       setCommission(commissionData as Commission);
 
-      // CORREÇÃO: Ordem da query
       const { data: rolesData, error: rolesError } = await db
         .from("commission_roles")
+        .select("*")
         .eq("commission_id", commissionData.id)
-        .eq("is_active", true)
-        .select("*");
+        .eq("ativo", true);
 
       if (rolesError) throw rolesError;
       const activeRoles = rolesData || [];

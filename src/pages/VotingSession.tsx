@@ -22,10 +22,9 @@ import { searchMembers } from "@/lib/search-utils";
 // Tipos baseados no nosso localStorage/client.ts
 interface Commission {
   id: string;
-  name: string;
-  nome?: string;
-  description: string | null;
-  year: number;
+  nome: string;
+  descricao: string | null;
+  ano: number;
   link_code: string;
   status: string;
   finalized_at: string | null;
@@ -45,9 +44,8 @@ interface CommissionRole {
 
 interface Member {
   id: string;
-  full_name: string;
-  nome_completo?: string;
-  nickname?: string;
+  nome_completo: string;
+  apelido?: string;
   voteCount?: number;
 }
 
@@ -125,10 +123,7 @@ export default function VotingSession() {
       // @ts-ignore
       const { data, error } = await db.from("commissions").select('*').eq("id", id).single();
       if (error) throw error;
-      setCommission({
-        ...data,
-        name: data.nome || data.name // Normalizar nome
-      });
+      setCommission(data);
     } catch (error) {
       console.error("Error loading commission details:", error);
       toast({
@@ -143,11 +138,10 @@ export default function VotingSession() {
 
   const loadRoles = async (id: string) => {
     try {
-      // @ts-ignore
       const { data, error } = await db
         .from("commission_roles")
-        .eq("commission_id", id)
-        .select("*");
+        .select("*")
+        .eq("commission_id", id);
 
       if (error) throw error;
 
@@ -175,15 +169,10 @@ export default function VotingSession() {
   const loadMembers = async () => {
     try {
       // @ts-ignore
-      const { data, error } = await db.from("members").select("id, full_name, nome_completo");
+      const { data, error } = await db.from("members").select("id, nome_completo");
       if (error) throw error;
 
-      const normalizedMembers = (data || []).map((m: any) => ({
-        ...m,
-        full_name: m.nome_completo || m.full_name
-      }));
-
-      setMembers(normalizedMembers);
+      setMembers(data || []);
     } catch (error) {
       console.error("Error loading members:", error);
       toast({
@@ -284,7 +273,7 @@ export default function VotingSession() {
     );
 
     if (!correspondingSurveyItem) {
-      return allMembers.sort((a, b) => a.full_name.localeCompare(b.full_name));
+      return allMembers.sort((a, b) => a.nome_completo.localeCompare(b.nome_completo));
     }
 
     const votesForThisRole = allSurveyVotes.filter(
@@ -316,7 +305,7 @@ export default function VotingSession() {
         if (b.voteCount !== a.voteCount) {
           return (b.voteCount || 0) - (a.voteCount || 0);
         }
-        return a.full_name.localeCompare(b.full_name);
+        return a.nome_completo.localeCompare(b.nome_completo);
       });
 
     return rankedMembers;
@@ -361,10 +350,9 @@ export default function VotingSession() {
     ? getRankedMembers(currentRole, members, surveyItems, surveyVotes)
     : [];
 
-  // Usar busca conforme RF-05: prioriza primeiro nome, fallback para sobrenomes
   const filteredRankedMembers = searchTerm.trim()
     ? searchMembers(
-      allRankedMembers.map(m => ({ ...m, nome_completo: m.full_name })),
+      allRankedMembers,
       searchTerm
     ).map(m => allRankedMembers.find(rm => rm.id === m.id)!)
     : allRankedMembers;
@@ -387,12 +375,12 @@ export default function VotingSession() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <h2 className="text-3xl font-bold text-center mb-2">
-          {commission.name}
-        </h2>
-        <p className="text-muted-foreground text-center mb-8">
-          {commission.description}
-        </p>
+         <h2 className="text-3xl font-bold text-center mb-2">
+           {commission.nome}
+         </h2>
+         <p className="text-muted-foreground text-center mb-8">
+           {commission.descricao}
+         </p>
 
         {currentRole ? (
           <Card>
@@ -428,7 +416,7 @@ export default function VotingSession() {
                       htmlFor={`member-${member.id}`}
                       className="flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      {member.full_name}
+                      {member.nome_completo}
                     </Label>
                     {member.voteCount && member.voteCount > 0 && (
                       <Badge variant="secondary" className="ml-2">
